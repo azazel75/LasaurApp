@@ -1,5 +1,5 @@
 # Super Awesome LasaurGrbl python flash script.
-# 
+#
 # Copyright (c) 2011 Nortd Labs
 # Open Source by the terms of the Gnu Public License (GPL3) or higher.
 
@@ -22,7 +22,15 @@ BUILDNAME = "LasaurGrbl"
 
 # use beaglebone gpio2_7 to reset the atmege here
 
-os.system('%(dude)s -c %(programmer)s -b %(bps)s %(serial_option)s -p %(device)s -C %(dudeconf)s -Uflash:w:%(product)s.hex:i' % {'dude':AVRDUDEAPP, 'programmer':PROGRAMMER, 'bps':BITRATE, 'serial_option':SERIAL_OPTION, 'device':DEVICE, 'dudeconf':AVRDUDECONFIG, 'product':BUILDNAME})
+os.system('%(dude)s -c %(programmer)s -b %(bps)s %(serial_option)s -p %(device)s '
+          '-C %(dudeconf)s -Uflash:w:%(product)s.hex:i' % {
+              'dude': AVRDUDEAPP,
+              'programmer': PROGRAMMER,
+              'bps': BITRATE,
+              'serial_option': SERIAL_OPTION,
+              'device': DEVICE,
+              'dudeconf': AVRDUDECONFIG,
+              'product': BUILDNAME
+          }
+)
 # os.system('%(dude)s -c %(programmer)s -b %(bps)s -P %(port)s -p %(device)s -C %(dudeconf)s -B 10 -F -U flash:w:%(product)s.hex:i' % {'dude':AVRDUDEAPP, 'programmer':PROGRAMMER, 'bps':BITRATE, 'port':SERIAL_PORT, 'device':DEVICE, 'dudeconf':AVRDUDECONFIG, 'product':BUILDNAME})
-
-

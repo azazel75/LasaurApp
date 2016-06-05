@@ -1,5 +1,4 @@
-
 allowed = {
-"admin":"",
-"yourname":"password"
+    "admin":"",
+    "yourname":"password"
 }

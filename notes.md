@@ -1,5 +1,3 @@
-
-
 CHANGE LOG
 -----------
 - confgurable work area (for modded lasersaurs)
@@ -81,10 +79,10 @@ Intaglio sets the width/height attribute to the document dimensions.
 Illustrator Units
 -----------------
 
-Illustrator sets both the width/height and the viewport attributes of the svg tag. Unfortunately it does not set this to the document dimensions but to the bounding box of all the geometry. This makes it completely useless to figure out the dpi scaling factor for pixels to in/mm conversion.
+Illustrator sets both the width/height and the viewport attributes of
+the svg tag. Unfortunately it does not set this to the document
+dimensions but to the bounding box of all the geometry. This makes it
+completely useless to figure out the dpi scaling factor for pixels to
+in/mm conversion.
 
 3460.472 x 1736.945
-
-
-
-

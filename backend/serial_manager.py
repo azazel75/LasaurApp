@@ -1,14 +1,12 @@
-
 import os
 import sys
 import time
 import serial
 from serial.tools import list_ports
-from collections import deque
 
 
 class SerialManagerClass:
-    
+
     def __init__(self):
         self.device = None
 
@@ -17,12 +15,12 @@ class SerialManagerClass:
         self.tx_index = 0
         self.remoteXON = True
 
-        # TX_CHUNK_SIZE - this is the number of bytes to be 
+        # TX_CHUNK_SIZE - this is the number of bytes to be
         # written to the device in one go. It needs to match the device.
         self.TX_CHUNK_SIZE = 16
         self.RX_CHUNK_SIZE = 16
         self.nRequested = 0
-        
+
         # used for calculating percentage done
         self.job_active = False
 
@@ -71,7 +69,7 @@ class SerialManagerClass:
                 ports.append(port)
                 print "%-20s" % (port,)
                 print "    desc: %s" % (desc,)
-                print "    hwid: %s" % (hwid,)            
+                print "    hwid: %s" % (hwid,)
         else:
             # iterator = sorted(list_ports.grep(''))  # does not return USB-style
             # scan for available ports. return a list of tuples (num, name)
@@ -79,7 +77,7 @@ class SerialManagerClass:
             for i in range(24):
                 try:
                     s = serial.Serial(port=i, baudrate=baudrate)
-                    ports.append(s.portstr)                
+                    ports.append(s.portstr)
                     available.append( (i, s.portstr))
                     s.close()
                 except serial.SerialException:
@@ -89,7 +87,7 @@ class SerialManagerClass:
         return ports
 
 
-            
+
     def match_device(self, search_regex, baudrate):
         if os.name == 'posix':
             matched_ports = list_ports.grep(search_regex)
@@ -110,17 +108,17 @@ class SerialManagerClass:
                         return s.portstr
                     s.close()
                 except serial.SerialException:
-                    pass      
-            return None      
-        
+                    pass
+            return None
+
 
     def connect(self, port, baudrate):
         self.rx_buffer = ""
         self.tx_buffer = ""
-        self.tx_index = 0    
+        self.tx_index = 0
         self.remoteXON = True
         self.reset_status()
-                
+
         # Create serial device with both read timeout set to 0.
         # This results in the read() being non-blocking
         # Write on the other hand uses a large timeout but should not be blocking
@@ -144,7 +142,7 @@ class SerialManagerClass:
             return True
         else:
             return False
-                    
+
     def is_connected(self):
         return bool(self.device)
 
@@ -181,7 +179,7 @@ class SerialManagerClass:
             else:
                 if line != '?':  # not ready unless just a ?-query
                     self.status['ready'] = False
-                    
+
                 if self.fec_redundancy > 0:  # using error correction
                     # prepend marker and checksum
                     checksum = 0
@@ -208,12 +206,12 @@ class SerialManagerClass:
         self.tx_buffer = ""
         self.tx_index = 0
         self.job_active = False
-                  
+
 
     def is_queue_empty(self):
         return self.tx_index >= len(self.tx_buffer)
-        
-    
+
+
     def get_queue_percentage_done(self):
         buflen = len(self.tx_buffer)
         if buflen == 0:
@@ -233,9 +231,9 @@ class SerialManagerClass:
                 self.status['paused'] = False
                 return False
 
-    
+
     def send_queue_as_ready(self):
-        """Continuously call this to keep processing queue."""    
+        """Continuously call this to keep processing queue."""
         if self.device and not self.status['paused']:
             try:
                 ### receiving
@@ -260,7 +258,7 @@ class SerialManagerClass:
                 else:
                     if self.nRequested == 0:
                         time.sleep(0.001)  # no rx/tx, rest a bit
-                
+
                 ### sending
                 if self.tx_index < len(self.tx_buffer):
                     if self.nRequested > 0:
@@ -311,7 +309,7 @@ class SerialManagerClass:
                                 sys.stdout.flush()
                             if actuallySent == 1:
                                 self.last_request_ready = time.time()
-                         
+
                 else:
                     if self.job_active:
                         # print "\nG-code stream finished!"
@@ -326,10 +324,10 @@ class SerialManagerClass:
                 self.close()
             except ValueError:
                 # Serial port appears closed => reset
-                self.close()     
+                self.close()
         else:
-            # serial disconnected    
-            self.status['ready'] = False  
+            # serial disconnected
+            self.status['ready'] = False
 
 
 
@@ -340,7 +338,7 @@ class SerialManagerClass:
             sys.stdout.flush()
         elif '^' in line:
             sys.stdout.write("\nFEC Correction!\n")
-            sys.stdout.flush()                                              
+            sys.stdout.flush()
         else:
             if '!' in line:
                 # in stop mode
@@ -368,7 +366,7 @@ class SerialManagerClass:
             if 'T' in line:  # Stop: Transmission Error
                 self.status['transmission_error'] = True
             else:
-                self.status['transmission_error'] = False                                
+                self.status['transmission_error'] = False
 
             if 'P' in line:  # Stop: Power is off
                 self.status['power_off'] = True
@@ -406,11 +404,11 @@ class SerialManagerClass:
             #     self.status['y'] = False
 
             if 'V' in line:
-                self.status['firmware_version'] = line[line.find('V')+1:]                     
+                self.status['firmware_version'] = line[line.find('V')+1:]
 
 
 
 
-            
+
 # singelton
 SerialManager = SerialManagerClass()

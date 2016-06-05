@@ -1,4 +1,3 @@
-
 __author__ = 'Stefan Hechenberger <stefan@nortd.com>'
 
 import re
@@ -9,7 +8,6 @@ from .webcolors import rgb_to_hex, normalize_hex, css3_names_to_hex
 from .utilities import matrixMult, parseFloats
 
 log = logging.getLogger("svg_reader")
-
 
 
 class SVGAttributeReader:
@@ -55,41 +53,41 @@ class SVGAttributeReader:
 
 
     def read_attrib(self, node, attr, value):
-    	"""Read any attribute.
+        """Read any attribute.
 
-    	This function delegates according to the _handlers map.
-    	"""
+        This function delegates according to the _handlers map.
+        """
         if attr in self._handlers and value.strip() != '':
-        	# log.debug("reading attrib: " + attr + ":" + value)
-        	self._handlers[attr](node, attr, value)
+                # log.debug("reading attrib: " + attr + ":" + value)
+                self._handlers[attr](node, attr, value)
 
 
 
     def stringAttrib(self, node, attr, value):
-    	"""Read a string attribute."""
+        """Read a string attribute."""
         if value != 'inherit':
             node[attr] = value
 
 
     def opacityAttrib(self, node, attr, value):
-    	"""Read a opacity attribute."""
+        """Read a opacity attribute."""
         try:
             node[attr] = min(1.0,max(0.0,float(value)))
         except ValueError:
-        	log.warn("invalid opacity, default to 1.0")
-        	node[attr] = 1.0
+                log.warn("invalid opacity, default to 1.0")
+                node[attr] = 1.0
 
     def dimensionAttrib(self, node, attr, value):
-    	"""Read a dimension attribute."""
+        """Read a dimension attribute."""
         node[attr] = self._parseUnit(value)
 
     def colorAttrib(self, node, attr, value):
         # http://www.w3.org/TR/SVG11/color.html
         # http://www.w3.org/TR/SVG11/painting.html#SpecifyingPaint
-    	"""Read a color attribute."""
+        """Read a color attribute."""
         col = self._parseColor(value)
         if col != 'inherit':
-	        node[attr] = col
+                node[attr] = col
 
 
 
@@ -111,7 +109,7 @@ class SVGAttributeReader:
                     xforms.append([1, 0, 0, 1, params[0], params[1]])
                 else:
                     log.warn('translate skipped; invalid num of params')
-            # rotate         
+            # rotate
             elif xformKind == 'rotate':
                 if len(params) == 3:
                     angle = params[0] * self.DEG_TO_RAD
@@ -123,7 +121,7 @@ class SVGAttributeReader:
                     xforms.append([math.cos(angle), math.sin(angle), -math.sin(angle), math.cos(angle), 0, 0])
                 else:
                     log.warn('rotate skipped; invalid num of params')
-            #scale       
+            #scale
             elif xformKind == 'scale':
                 if len(params) == 1:
                     xforms.append([params[0], 0, 0, params[0], 0, 0])
@@ -137,7 +135,7 @@ class SVGAttributeReader:
                     xforms.append(params)
                 else:
                     log.warn('matrix skipped; invalid num of params')
-            # skewX        
+            # skewX
             elif xformKind == 'skewX':
                 if len(params) == 1:
                     angle = params[0]*self.DEG_TO_RAD
@@ -156,16 +154,16 @@ class SVGAttributeReader:
         xform_combined = [1,0,0,1,0,0]
         for xform in xforms:
             xform_combined = matrixMult(xform_combined, xform)
-        
+
         # assign
-        node['xform'] = xform_combined  
+        node['xform'] = xform_combined
 
 
     def styleAttrib(self, node, attr, value):
         # style attribute
         # http://www.w3.org/TR/SVG11/styling.html#StyleAttribute
         # http://www.w3.org/TR/SVG11/styling.html#SVGStylingProperties
-        # example: <rect x="200" y="100" width="600" height="300" 
+        # example: <rect x="200" y="100" width="600" height="300"
         #          style="fill: red; stroke: blue; stroke-width: 3"/>
         # relay to parse style attributes the same as Presentation Attributes
         segs = value.split(";")
@@ -176,11 +174,11 @@ class SVGAttributeReader:
                 v = kv[1].strip()
                 if k != 'style':  # prevent infinite loop
                     self.read_attrib(node, k, v)
-        # Also see: Presentations Attributes 
+        # Also see: Presentations Attributes
         # http://www.w3.org/TR/SVG11/styling.html#UsingPresentationAttributes
-        # example: <rect x="200" y="100" width="600" height="300" 
+        # example: <rect x="200" y="100" width="600" height="300"
         #          fill="red" stroke="blue" stroke-width="3"/>
-    
+
 
     def dAttrib(self, node, attr, value):
         """Read the 'd' attribute, complex path data."""
@@ -196,12 +194,12 @@ class SVGAttributeReader:
 
 
     def pointsAttrib(self, node, attr, value):
-    	"""Read the 'points' attribute."""
-    	floats = parseFloats(value)
+        """Read the 'points' attribute."""
+        floats = parseFloats(value)
         if len(floats) % 2 == 0:
             node[attr] = floats
         else:
-        	log.error("odd number of vertices")
+                log.error("odd number of vertices")
 
 
 
@@ -215,7 +213,7 @@ class SVGAttributeReader:
                 unit = vals[0][1]
                 if unit == '':
                     return num
-                
+
                 if unit == 'cm':
                     num *= self.svgreader.dpi/2.54
                 elif unit == 'mm':
@@ -242,11 +240,11 @@ class SVGAttributeReader:
         'none' means that the geometry is not to be rendered.
         See: http://www.w3.org/TR/SVG11/painting.html#SpecifyingPaint
         """
-        # http://www.w3.org/TR/SVG11/color.html 
+        # http://www.w3.org/TR/SVG11/color.html
         # http://www.w3.org/TR/2008/REC-CSS2-20080411/syndata.html#color-units
         if val[0] == " ":
             val = val.strip()
-            
+
         if val[0] == '#':
             return normalize_hex(val)
         elif val.startswith('rgba'):
@@ -259,7 +257,7 @@ class SVGAttributeReader:
             floats = parseFloats(val[4:-1])
             if len(floats) == 3:
                 return rgb_to_hex(tuple(floats))
-        elif val == 'none': 
+        elif val == 'none':
             # 'none' means the geometry is not to be filled or stroked
             # http://www.w3.org/TR/SVG11/painting.html#SpecifyingPaint
             return 'none'
@@ -274,7 +272,3 @@ class SVGAttributeReader:
         else:
             log.warn("invalid color, skipped: " + str(val))
             return 'inherit'
-
-
-
-

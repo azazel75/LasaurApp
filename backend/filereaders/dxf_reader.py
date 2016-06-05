@@ -21,13 +21,13 @@ class DXFReader:
     """
 
     def __init__(self, tolerance):
-        # tolerance settings, used in tessalation, path simplification, etc         
+        # tolerance settings, used in tessalation, path simplification, etc
         self.tolerance = tolerance
         self.tolerance2 = tolerance**2
 
         # parsed path data, paths by color
         # {'#ff0000': [[path0, path1, ..], [path0, ..], ..]}
-        # Each path is a list of vertices which is a list of two floats.        
+        # Each path is a list of vertices which is a list of two floats.
         self.boundarys = {'#000000':[]}
         self.black_boundarys = self.boundarys['#000000']
 
@@ -87,7 +87,7 @@ class DXFReader:
     def readoneline(self):
         self.linecount += 1
         self.line = self.infile.readline()
-        if not self.line: 
+        if not self.line:
             print "Premature end of file!"
             print "Something is wrong. Sorry!"
             raise ValueError
@@ -112,9 +112,9 @@ class DXFReader:
         y2 = float(self.readgroup(21))
         if self.metricflag == 0:
             x1 = x1*25.4
-            y1 = y1*25.4        
+            y1 = y1*25.4
             x2 = x2*25.4
-            y2 = y2*25.4        
+            y2 = y2*25.4
         self.black_boundarys.append([[x1,y1],[x2,y2]])
 
     def do_circle(self):
@@ -123,8 +123,8 @@ class DXFReader:
         r = float(self.readgroup(40))
         if self.metricflag == 0:
             cx = cx*25.4
-            cy = cy*25.4        
-            r = r*25.4  
+            cy = cy*25.4
+            r = r*25.4
         path = []
         self.addArc(path, cx-r, cy, r, r, 0, 0, 0, cx, cy+r)
         self.addArc(path, cx, cy+r, r, r, 0, 0, 0, cx+r, cy)
@@ -138,8 +138,8 @@ class DXFReader:
         r = float(self.readgroup(40))
         if self.metricflag == 0:
             cx = cx*25.4
-            cy = cy*25.4        
-            r = r*25.4        
+            cy = cy*25.4
+            r = r*25.4
         theta1deg = float(self.readgroup(50))
         theta2deg = float(self.readgroup(51))
         thetadiff = theta2deg-theta1deg
@@ -200,7 +200,7 @@ class DXFReader:
         cy_ = -r*ry*x_ / rx
         cx = cp*cx_ - sp*cy_ + 0.5*(x1 + x2)
         cy = sp*cx_ + cp*cy_ + 0.5*(y1 + y2)
-        
+
         def _angle(u, v):
             a = math.acos((u[0]*v[0] + u[1]*v[1]) /
                             math.sqrt(((u[0])**2 + (u[1])**2) *
@@ -209,25 +209,25 @@ class DXFReader:
             if u[0]*v[1] > u[1]*v[0]:
                 sgn = 1
             return sgn * a
-    
+
         psi = _angle([1,0], [(x_-cx_)/rx, (y_-cy_)/ry])
         delta = _angle([(x_-cx_)/rx, (y_-cy_)/ry], [(-x_-cx_)/rx, (-y_-cy_)/ry])
         if sweep and delta < 0:
             delta += math.pi * 2
         if not sweep and delta > 0:
             delta -= math.pi * 2
-        
+
         def _getVertex(pct):
             theta = psi + delta * pct
             ct = math.cos(theta)
             st = math.sin(theta)
-            return [cp*rx*ct-sp*ry*st+cx, sp*rx*ct+cp*ry*st+cy]        
-        
+            return [cp*rx*ct-sp*ry*st+cx, sp*rx*ct+cp*ry*st+cy]
+
         # let the recursive fun begin
         def _recursiveArc(t1, t2, c1, c5, level, tolerance2):
             def _vertexDistanceSquared(v1, v2):
                 return (v2[0]-v1[0])**2 + (v2[1]-v1[1])**2
-            
+
             def _vertexMiddle(v1, v2):
                 return [ (v2[0]+v1[0])/2.0, (v2[1]+v1[1])/2.0 ]
 
@@ -246,7 +246,7 @@ class DXFReader:
             path.append(c3)
             if _vertexDistanceSquared(c4, _vertexMiddle(c3,c5)) > tolerance2:
                 _recursiveArc(tHalf, t2, c3, c5, level+1, tolerance2)
-                
+
         t1Init = 0.0
         t2Init = 1.0
         c1Init = _getVertex(t1Init)
@@ -254,8 +254,3 @@ class DXFReader:
         path.append(c1Init)
         _recursiveArc(t1Init, t2Init, c1Init, c5Init, 0, self.tolerance2)
         path.append(c5Init)
-
-
-
-
-

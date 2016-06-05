@@ -1,5 +1,5 @@
 # Super Awesome LasaurGrbl python flash script.
-# 
+#
 # Copyright (c) 2011 Nortd Labs
 # Open Source by the terms of the Gnu Public License (GPL3) or higher.
 
@@ -18,33 +18,47 @@ def flash_upload(serial_port, resources_dir, firmware_file, hardware='x86'):
         CLOCK = "16000000"
         PROGRAMMER = "arduino"
         BITRATE = "115200"
-     
+
         if sys.platform == "darwin":  # OSX
-            AVRDUDEAPP    = os.path.join(resources_dir, "firmware/tools_osx/avrdude")
-            AVRDUDECONFIG = os.path.join(resources_dir, "firmware/tools_osx/avrdude.conf")
-        
+            AVRDUDEAPP    = os.path.join(resources_dir,
+                                         "firmware/tools_osx/avrdude")
+            AVRDUDECONFIG = os.path.join(resources_dir,
+                                         "firmware/tools_osx/avrdude.conf")
+
         elif sys.platform == "win32": # Windows
-            AVRDUDEAPP    = os.path.join(resources_dir, "firmware", "tools_win", "avrdude")
-            AVRDUDECONFIG = os.path.join(resources_dir, "firmware", "tools_win", "avrdude.conf")
-        
+            AVRDUDEAPP    = os.path.join(resources_dir, "firmware", "tools_win",
+                                         "avrdude")
+            AVRDUDECONFIG = os.path.join(resources_dir, "firmware", "tools_win",
+                                         "avrdude.conf")
+
         elif sys.platform == "linux" or sys.platform == "linux2":  #Linux
             AVRDUDEAPP    = os.path.join(resources_dir, "/usr/bin/avrdude")
             AVRDUDECONFIG = os.path.join(resources_dir, "/etc/avrdude.conf")
 
         # call avrdude, returns 0 on success
-        command = ('"%(dude)s" -c %(programmer)s -b %(bps)s -P %(port)s -p %(device)s -C "%(dudeconf)s" -Uflash:w:"%(firmware)s":i' 
-            % {'dude':AVRDUDEAPP, 'programmer':PROGRAMMER, 'bps':BITRATE, 'port':serial_port, 'device':DEVICE, 'dudeconf':AVRDUDECONFIG, 'firmware':FIRMWARE})
+        command = ('"%(dude)s" -c %(programmer)s -b %(bps)s -P %(port)s '
+                   '-p %(device)s -C "%(dudeconf)s" -Uflash:w:"%(firmware)s":i'
+            % {
+                'dude':AVRDUDEAPP,
+                'programmer':PROGRAMMER,
+                'bps':BITRATE,
+                'port':serial_port,
+                'device':DEVICE,
+                'dudeconf':AVRDUDECONFIG,
+                'firmware':FIRMWARE
+            }
+        )
 
         print command
         return subprocess.call(command, shell=True)
 
-        # PROGRAMMER = "avrisp"  # old way, required pressing the reset button            
-        # os.system('%(dude)s -c %(programmer)s -b %(bps)s -P %(port)s -p %(device)s -C %(dudeconf)s -B 10 -F -U flash:w:%(firmware)s:i' 
+        # PROGRAMMER = "avrisp"  # old way, required pressing the reset button
+        # os.system('%(dude)s -c %(programmer)s -b %(bps)s -P %(port)s -p %(device)s -C %(dudeconf)s -B 10 -F -U flash:w:%(firmware)s:i'
         #     % {'dude':AVRDUDEAPP, 'programmer':PROGRAMMER, 'bps':BITRATE, 'port':serial_port, 'device':DEVICE, 'dudeconf':AVRDUDECONFIG, 'firmware':FIRMWARE})
 
         # fuse setting taken over from Makefile for reference
         #os.system('%(dude)s -U hfuse:w:0xd2:m -U lfuse:w:0xff:m' % {'dude':AVRDUDEAPP})
-    
+
     elif hardware in ['beaglebone', 'raspberrypi']:
         # Make sure you have avrdude installed:
         # beaglebone:

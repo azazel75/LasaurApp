@@ -1,12 +1,8 @@
-
 __author__ = 'Stefan Hechenberger <stefan@nortd.com>'
 
-import re
-import math
 import logging
 
-from .webcolors import hex_to_rgb, rgb_to_hex
-from .utilities import matrixMult, matrixApply
+from .utilities import matrixApply
 from .utilities import vertexScale, parseFloats, parseScalar
 from .svg_tag_reader import SVGTagReader
 

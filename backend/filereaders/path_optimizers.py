@@ -5,7 +5,7 @@ The format of a path segment is:
 [[x1,y1],[x2,y2],...]
 
 The format of path is:
-[pathseg1, pathseg2, ...] 
+[pathseg1, pathseg2, ...]
 
 This module is typically used by calling the 'optimize' function.
 It takes a list of paths and optimizes in-place.
@@ -14,7 +14,6 @@ It takes a list of paths and optimizes in-place.
 __author__ = 'Stefan Hechenberger <stefan@nortd.com>'
 
 
-import math
 import logging
 
 import kdtree
@@ -44,7 +43,7 @@ def connect_segments(path, epsilon2):
             lastpathseg.extend(pathseg[1:])
             join_count += 1
             continue
-        
+
         # add as is
         newIdx += 1
         path[newIdx] = pathseg
@@ -130,7 +129,7 @@ def simplify(pathseg, tolerance2):
     Users of this code must verify correctness for their application.
     http://softsurfer.com/Archive/algorithm_0205/algorithm_0205.htm
     """
-    
+
     n = len(pathseg)
     if n == 0:
         return []
@@ -172,7 +171,7 @@ def simplify_all(path, tolerance2):
         path[u] = simplify(path[u], tolerance2)
         optiverts += len(path[u])
     if totalverts > 0:
-        # report polyline optimizations    
+        # report polyline optimizations
         difflength = totalverts - optiverts
         diffpct = (100*difflength/totalverts)
         if diffpct > 10:  # if diff more than 10%
