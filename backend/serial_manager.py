@@ -164,11 +164,13 @@ class SerialManagerClass:
 
 
     def queue_gcode(self, gcode):
-        lines = gcode.split('\n')
+        if isinstance(gcode, str):
+            gcode = gcode.encode('utf-8')
+        lines = gcode.split(b'\n')
         print("Adding to queue %s lines" % len(lines))
         job_list = []
         for line in lines:
-            line = line.strip().encode('utf-8')
+            line = line.strip()
             if line == b'' or line[0] == b'%':
                 continue
 
@@ -184,16 +186,15 @@ class SerialManagerClass:
                     # prepend marker and checksum
                     checksum = 0
                     for c in line:
-                        ascii_ord = ord(c)
-                        if ascii_ord > ord(b' ') and c != b'~' and c != b'!':  #ignore 32 and lower, ~, !
-                            checksum += ascii_ord
+                        if c > ord(b' ') and c != ord(b'~') and c != ord(b'!'):  #ignore 32 and lower, ~, !
+                            checksum += c
                             if checksum >= 128:
                                 checksum -= 128
                     checksum = (checksum >> 1) + 128
                     line_redundant = bytearray()
                     for n in range(self.fec_redundancy - 1):
-                        line_redundant += b'^' + chr(checksum) + line + b'\n'
-                    line = line_redundant + b'*' + chr(checksum) + line
+                        line_redundant += b'^' + bytes([checksum]) + line + b'\n'
+                    line = line_redundant + b'*' + bytes([checksum]) + line
 
                 job_list.append(line)
 
