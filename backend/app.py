@@ -1,14 +1,24 @@
+import argparse
+import copy
+import glob
+import json
+import logging
+import os
+import socket
 import sys, os, time
-import glob, json, argparse, copy
 import tempfile
-import socket, webbrowser
-from wsgiref.simple_server import WSGIRequestHandler, make_server
+import time
+import webbrowser
+
 from bottle import *
+from wsgiref.simple_server import WSGIRequestHandler, make_server
+
 from serial_manager import SerialManager
 from flash import flash_upload, reset_atmega
 from build import build_firmware
 from filereaders import read_svg, read_dxf, read_ngc
 
+logger = logging.getLogger(__name__)
 
 APPNAME = "lasaurapp"
 VERSION = "14.11b"
