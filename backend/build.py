@@ -73,7 +73,7 @@ def build_firmware(source_dir, firmware_dir, firmware_name):
 
     try:
         ## clean after upload
-        print "Cleaning up build files."
+        print("Cleaning up build files.")
         for fileobj in OBJECTS:
             f = '%s.o' % (fileobj)
             if os.path.isfile(f):
@@ -82,7 +82,7 @@ def build_firmware(source_dir, firmware_dir, firmware_name):
             os.remove('main.elf')
 
         ## move firmware hex file
-        print "Moving firmware to standard location."
+        print("Moving firmware to standard location.")
         firmware_src = firmware_name+'.hex'
         firmware_dst = os.path.join(firmware_dir, firmware_src)
         shutil.move(firmware_src, firmware_dst)

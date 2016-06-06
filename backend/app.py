@@ -95,21 +95,21 @@ def run_with_callback(host, port):
     server = make_server(host, port, handler, handler_class=HackedWSGIRequestHandler)
     server.timeout = 0.01
     server.quiet = True
-    print "Persistent storage root is: " + storage_dir()
-    print "-----------------------------------------------------------------------------"
-    print "Bottle server starting up ..."
-    print "Serial is set to %d bps" % BITSPERSECOND
-    print "Point your browser to: "
-    print "http://%s:%d/      (local)" % ('127.0.0.1', port)
+    print("Persistent storage root is: %s" % storage_dir())
+    print("-----------------------------------------------------------------------------")
+    print("Bottle server starting up ...")
+    print("Serial is set to %d bps" % BITSPERSECOND)
+    print("Point your browser to: ")
+    print("http://%s:%d/      (local)" % ('127.0.0.1', port))
     # if host == '':
     #     try:
     #         print "http://%s:%d/   (public)" % (socket.gethostbyname(socket.gethostname()), port)
     #     except socket.gaierror:
     #         # print "http://beaglebone.local:4444/      (public)"
     #         pass
-    print "Use Ctrl-C to quit."
-    print "-----------------------------------------------------------------------------"
-    print
+    print("Use Ctrl-C to quit.")
+    print("-----------------------------------------------------------------------------")
+    print()
     # auto-connect on startup
     global SERIAL_PORT
     if not SERIAL_PORT:
@@ -117,10 +117,10 @@ def run_with_callback(host, port):
     SerialManager.connect(SERIAL_PORT, BITSPERSECOND)
     # open web-browser
     try:
-        webbrowser.open_new_tab('http://127.0.0.1:'+str(port))
+        webbrowser.open_new_tab('http://127.0.0.1:%s' % port)
         pass
     except webbrowser.Error:
-        print "Cannot open Webbrowser, please do so manually."
+        print("Cannot open Webbrowser, please do so manually.")
     sys.stdout.flush()  # make sure everything gets flushed
     server.timeout = 0
     while 1:
@@ -130,7 +130,7 @@ def run_with_callback(host, port):
             time.sleep(0.0004)
         except KeyboardInterrupt:
             break
-    print "\nShutting down..."
+    print("\nShutting down...")
     SerialManager.close()
 
 
@@ -206,7 +206,7 @@ def library_list_handler():
     cwd_temp = os.getcwd()
     try:
         os.chdir(storage_dir())
-        files = filter(os.path.isfile, glob.glob("*"))
+        files = list(filter(os.path.isfile, glob.glob("*")))
         files.sort(key=lambda x: os.path.getmtime(x))
     finally:
         os.chdir(cwd_temp)
@@ -224,12 +224,12 @@ def queue_save_handler():
         try:
             fp = open(filename, 'w')
             fp.write(job_data)
-            print "file saved: " + filename
+            print("file saved: %s" % filename)
             ret = '1'
         finally:
             fp.close()
     else:
-        print "error: save failed, invalid POST request"
+        print("error: save failed, invalid POST request")
     return ret
 
 @route('/queue/rm/:name')
@@ -241,7 +241,7 @@ def queue_rm_handler(name):
         if os.path.exists(filename):
             try:
                 os.remove(filename);
-                print "file deleted: " + filename
+                print("file deleted: %s" % filename)
                 ret = '1'
             finally:
                 pass
@@ -255,7 +255,7 @@ def queue_clear_handler():
     cwd_temp = os.getcwd()
     try:
         os.chdir(storage_dir())
-        files = filter(os.path.isfile, glob.glob("*"))
+        files = list(filter(os.path.isfile, glob.glob("*")))
         files.sort(key=lambda x: os.path.getmtime(x))
     finally:
         os.chdir(cwd_temp)
@@ -264,7 +264,7 @@ def queue_clear_handler():
             filename = os.path.join(storage_dir(), filename)
             try:
                 os.remove(filename);
-                print "file deleted: " + filename
+                print("file deleted: %s"  % filename)
                 ret = '1'
             finally:
                 pass
@@ -309,13 +309,13 @@ def stash_download():
     with fp:
         fp.write(filedata)
         fp.close()
-    print filedata
-    print "file stashed: " + os.path.basename(filename)
+    print(filedata)
+    print("file stashed: %s" % os.path.basename(filename))
     return os.path.basename(filename)
 
 @route('/download/:filename/:dlname')
 def download(filename, dlname):
-    print "requesting: " + filename
+    print("requesting: %s" % filename)
     return static_file(filename, root=tempfile.gettempdir(), download=dlname)
 
 
@@ -336,7 +336,7 @@ def serial_handler(connect):
                 return ret
             except serial.SerialException:
                 SERIAL_PORT = None
-                print "Failed to connect to serial."
+                print("Failed to connect to serial.")
                 return ""
     elif connect == '0':
         # print 'js is asking to close serial'
@@ -348,7 +348,7 @@ def serial_handler(connect):
         if SerialManager.is_connected(): return "1"
         else: return ""
     else:
-        print 'ambigious connect request from js: ' + connect
+        print('ambigious connect request from js: %s' % connect)
         return ""
 
 
@@ -366,12 +366,12 @@ def set_pause(flag):
     # returns pause status
     if flag == '1':
         if SerialManager.set_pause(True):
-            print "pausing ..."
+            print("pausing ...")
             return '1'
         else:
             return '0'
     elif flag == '0':
-        print "resuming ..."
+        print("resuming ...")
         if SerialManager.set_pause(False):
             return '1'
         else:
@@ -388,7 +388,7 @@ def flash_firmware_handler(firmware_file=FIRMWARE):
         SerialManager.close()
     # get serial port by url argument
     # e.g: /flash_firmware?port=COM3
-    if 'port' in request.GET.keys():
+    if 'port' in list(request.GET.keys()):
         serial_port = request.GET['port']
         if serial_port[:3] == "COM" or serial_port[:4] == "tty.":
             SERIAL_PORT = serial_port
@@ -401,10 +401,10 @@ def flash_firmware_handler(firmware_file=FIRMWARE):
     if not SERIAL_PORT:
         comport_list = SerialManager.list_devices(BITSPERSECOND)
         for port in comport_list:
-            print "Trying com port: " + port
+            print("Trying com port: %s" % port)
             return_code = flash_upload(port, resources_dir(), firmware_file, HARDWARE)
             if return_code == 0:
-                print "Success with com port: " + port
+                print("Success with com port: %s" % port)
                 SERIAL_PORT = port
                 break
     else:
@@ -413,12 +413,12 @@ def flash_firmware_handler(firmware_file=FIRMWARE):
     ret.append('Using com port: %s<br>' % (SERIAL_PORT))
     ret.append('Using firmware: %s<br>' % (firmware_file))
     if return_code == 0:
-        print "SUCCESS: Arduino appears to be flashed."
+        print("SUCCESS: Arduino appears to be flashed.")
         ret.append('<h2>Successfully Flashed!</h2><br>')
         ret.append('<a href="/">return</a>')
         return ''.join(ret)
     else:
-        print "ERROR: Failed to flash Arduino."
+        print("ERROR: Failed to flash Arduino.")
         ret.append('<h2>Flashing Failed!</h2> Check terminal window for possible errors. ')
         ret.append('Most likely LasaurApp could not find the right serial port.')
         ret.append('<br><a href="/flash_firmware/'+firmware_file+'">try again</a> or <a href="/">return</a><br><br>')
@@ -437,12 +437,12 @@ def build_firmware_handler():
     source_dir = os.path.join(resources_dir(), 'firmware', 'src')
     return_code = build_firmware(source_dir, firmware_dir, buildname)
     if return_code != 0:
-        print ret
+        print(ret)
         ret.append('<h2>FAIL: build error!</h2>')
         ret.append('Syntax error maybe? Try builing in the terminal.')
         ret.append('<br><a href="/">return</a><br><br>')
     else:
-        print "SUCCESS: firmware built."
+        print("SUCCESS: firmware built.")
         ret.append('<h2>SUCCESS: new firmware built!</h2>')
         ret.append('<br><a href="/flash_firmware/'+buildname+'.hex">Flash Now!</a><br><br>')
     return ''.join(ret)
@@ -495,7 +495,7 @@ def file_reader():
         pass
 
     if filename and filedata:
-        print "You uploaded %s (%d bytes)." % (filename, len(filedata))
+        print("You uploaded %s (%d bytes)." % (filename, len(filedata)))
         if filename[-4:] in ['.dxf', '.DXF']:
             res = read_dxf(filedata, TOLERANCE, optimize)
         elif filename[-4:] in ['.svg', '.SVG']:
@@ -503,7 +503,7 @@ def file_reader():
         elif filename[-4:] in ['.ngc', '.NGC']:
             res = read_ngc(filedata, TOLERANCE, optimize)
         else:
-            print "error: unsupported file format"
+            print("error: unsupported file format")
 
         # print boundarys
         jsondata = json.dumps(res)
@@ -563,7 +563,7 @@ args = argparser.parse_args()
 
 
 
-print "LasaurApp " + VERSION
+print("LasaurApp %s" % VERSION)
 
 if args.beaglebone:
     HARDWARE = 'beaglebone'
@@ -675,7 +675,7 @@ if args.beaglebone:
     fw = file("/sys/class/gpio/gpio76/value", "r")
     ret = fw.read()
     fw.close()
-    print "Stepper driver configure pin is: " + str(ret)
+    print("Stepper driver configure pin is: %s" % str(ret))
 
 elif args.raspberrypi:
     HARDWARE = 'raspberrypi'
@@ -710,7 +710,7 @@ else:
         if args.port:
             # (1) get the serial device from the argument list
             SERIAL_PORT = args.port
-            print "Using serial device '"+ SERIAL_PORT +"' from command line."
+            print("Using serial device '%s' from command line." % SERIAL_PORT)
         else:
             # (2) get the serial device from the config file
             if os.path.isfile(CONFIG_FILE):
@@ -718,42 +718,42 @@ else:
                 line = fp.readline().strip()
                 if len(line) > 3:
                     SERIAL_PORT = line
-                    print "Using serial device '"+ SERIAL_PORT +"' from '" + CONFIG_FILE + "'."
+                    print("Using serial device '%s' from '%s'." % (SERIAL_PORT, CONFIG_FILE))
 
     if not SERIAL_PORT:
         if args.match:
             GUESS_PREFIX = args.match
             SERIAL_PORT = SerialManager.match_device(GUESS_PREFIX, BITSPERSECOND)
             if SERIAL_PORT:
-                print "Using serial device '"+ str(SERIAL_PORT)
+                print("Using serial device '%s''" % str(SERIAL_PORT))
                 if os.name == 'posix':
                     # not for windows for now
-                    print "(first device to match: " + args.match + ")"
+                    print("(first device to match: %s)"  % args.match)
         else:
             SERIAL_PORT = SerialManager.match_device(GUESS_PREFIX, BITSPERSECOND)
             if SERIAL_PORT:
-                print "Using serial device '"+ str(SERIAL_PORT) +"' by best guess."
+                print("Using serial device '%s' by best guess." % str(SERIAL_PORT))
 
     if not SERIAL_PORT:
-        print "-----------------------------------------------------------------------------"
-        print "WARNING: LasaurApp doesn't know what serial device to connect to!"
-        print "Make sure the Lasersaur hardware is connectd to the USB interface."
+        print("-----------------------------------------------------------------------------")
+        print("WARNING: LasaurApp doesn't know what serial device to connect to!")
+        print("Make sure the Lasersaur hardware is connectd to the USB interface.")
         if os.name == 'nt':
-            print "ON WINDOWS: You will also need to setup the virtual com port."
-            print "See 'Installing Drivers': http://arduino.cc/en/Guide/Windows"
-        print "-----------------------------------------------------------------------------"
+            print("ON WINDOWS: You will also need to setup the virtual com port.")
+            print("See 'Installing Drivers': http://arduino.cc/en/Guide/Windows")
+        print("-----------------------------------------------------------------------------")
 
     # run
     if args.debug:
         debug(True)
         if hasattr(sys, "_MEIPASS"):
-            print "Data root is: " + sys._MEIPASS
+            print("Data root is: %s" % sys._MEIPASS)
     if args.flash:
         return_code = flash_upload(SERIAL_PORT, resources_dir(), FIRMWARE, HARDWARE)
         if return_code == 0:
-            print "SUCCESS: Arduino appears to be flashed."
+            print("SUCCESS: Arduino appears to be flashed.")
         else:
-            print "ERROR: Failed to flash Arduino."
+            print("ERROR: Failed to flash Arduino.")
     elif args.build_flash:
         # build
         buildname = "LasaurGrbl_from_src"
@@ -761,15 +761,15 @@ else:
         source_dir = os.path.join(resources_dir(), 'firmware', 'src')
         return_code = build_firmware(source_dir, firmware_dir, buildname)
         if return_code != 0:
-            print ret
+            print(ret)
         else:
-            print "SUCCESS: firmware built."
+            print("SUCCESS: firmware built.")
             # flash
             return_code = flash_upload(SERIAL_PORT, resources_dir(), FIRMWARE, HARDWARE)
             if return_code == 0:
-                print "SUCCESS: Arduino appears to be flashed."
+                print("SUCCESS: Arduino appears to be flashed.")
             else:
-                print "ERROR: Failed to flash Arduino."
+                print("ERROR: Failed to flash Arduino.")
     else:
         if args.host_on_all_interfaces:
             run_with_callback('', NETWORK_PORT)

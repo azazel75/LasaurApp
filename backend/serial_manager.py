@@ -10,8 +10,8 @@ class SerialManagerClass:
     def __init__(self):
         self.device = None
 
-        self.rx_buffer = ""
-        self.tx_buffer = ""
+        self.rx_buffer = bytearray()
+        self.tx_buffer = bytearray()
         self.tx_index = 0
         self.remoteXON = True
 
@@ -28,13 +28,13 @@ class SerialManagerClass:
         self.status = {}
         self.reset_status()
 
-        self.LASAURGRBL_FIRST_STRING = "LasaurGrbl"
+        self.LASAURGRBL_FIRST_STRING = b"LasaurGrbl"
 
         self.fec_redundancy = 2  # use forward error correction
         # self.fec_redundancy = 1  # use error detection
 
-        self.ready_char = '\x12'
-        self.request_ready_char = '\x14'
+        self.ready_char = b'\x12'
+        self.request_ready_char = b'\x14'
         self.last_request_ready = 0
 
 
@@ -64,12 +64,12 @@ class SerialManagerClass:
         ports = []
         if os.name == 'posix':
             iterator = sorted(list_ports.grep('tty'))
-            print "Found ports:"
+            print("Found ports:")
             for port, desc, hwid in iterator:
                 ports.append(port)
-                print "%-20s" % (port,)
-                print "    desc: %s" % (desc,)
-                print "    hwid: %s" % (hwid,)
+                print("%-20s" % (port,))
+                print("    desc: %s" % (desc,))
+                print("    hwid: %s" % (hwid,))
         else:
             # iterator = sorted(list_ports.grep(''))  # does not return USB-style
             # scan for available ports. return a list of tuples (num, name)
@@ -82,8 +82,8 @@ class SerialManagerClass:
                     s.close()
                 except serial.SerialException:
                     pass
-            print "Found ports:"
-            for n,s in available: print "(%d) %s" % (n,s)
+            print("Found ports:")
+            for n,s in available: print("(%d) %s" % (n,s))
         return ports
 
 
@@ -95,11 +95,11 @@ class SerialManagerClass:
                 for match_tuple in matched_ports:
                     if match_tuple:
                         return match_tuple[0]
-            print "No serial port match for anything like: " + search_regex
+            print("No serial port match for anything like: " + search_regex)
             return None
         else:
             # windows hack because pyserial does not enumerate USB-style com ports
-            print "Trying to find Controller ..."
+            print("Trying to find Controller ...")
             for i in range(24):
                 try:
                     s = serial.Serial(port=i, baudrate=baudrate, timeout=2.0)
@@ -113,8 +113,8 @@ class SerialManagerClass:
 
 
     def connect(self, port, baudrate):
-        self.rx_buffer = ""
-        self.tx_buffer = ""
+        self.rx_buffer = bytearray()
+        self.tx_buffer = bytearray()
         self.tx_index = 0
         self.remoteXON = True
         self.reset_status()
@@ -150,7 +150,7 @@ class SerialManagerClass:
         if self.is_queue_empty():
             # trigger a status report
             # will update for the next status request
-            self.queue_gcode('?')
+            self.queue_gcode(b'?')
         return self.status
 
 
@@ -165,19 +165,19 @@ class SerialManagerClass:
 
     def queue_gcode(self, gcode):
         lines = gcode.split('\n')
-        print "Adding to queue %s lines" % len(lines)
+        print("Adding to queue %s lines" % len(lines))
         job_list = []
         for line in lines:
-            line = line.strip()
-            if line == '' or line[0] == '%':
+            line = line.strip().encode('utf-8')
+            if line == b'' or line[0] == b'%':
                 continue
 
-            if line[0] == '!':
+            if line[0] == b'!':
                 self.cancel_queue()
                 self.reset_status()
-                job_list.append('!')
+                job_list.append(b'!')
             else:
-                if line != '?':  # not ready unless just a ?-query
+                if line != b'?':  # not ready unless just a ?-query
                     self.status['ready'] = False
 
                 if self.fec_redundancy > 0:  # using error correction
@@ -185,25 +185,25 @@ class SerialManagerClass:
                     checksum = 0
                     for c in line:
                         ascii_ord = ord(c)
-                        if ascii_ord > ord(' ') and c != '~' and c != '!':  #ignore 32 and lower, ~, !
+                        if ascii_ord > ord(b' ') and c != b'~' and c != b'!':  #ignore 32 and lower, ~, !
                             checksum += ascii_ord
                             if checksum >= 128:
                                 checksum -= 128
                     checksum = (checksum >> 1) + 128
-                    line_redundant = ""
-                    for n in range(self.fec_redundancy-1):
-                        line_redundant += '^' + chr(checksum) + line + '\n'
-                    line = line_redundant + '*' + chr(checksum) + line
+                    line_redundant = bytearray()
+                    for n in range(self.fec_redundancy - 1):
+                        line_redundant += b'^' + chr(checksum) + line + b'\n'
+                    line = line_redundant + b'*' + chr(checksum) + line
 
                 job_list.append(line)
 
-        gcode_processed = '\n'.join(job_list) + '\n'
+        gcode_processed = b'\n'.join(job_list) + b'\n'
         self.tx_buffer += gcode_processed
         self.job_active = True
 
 
     def cancel_queue(self):
-        self.tx_buffer = ""
+        self.tx_buffer = bytearray()
         self.tx_index = 0
         self.job_active = False
 
@@ -216,7 +216,7 @@ class SerialManagerClass:
         buflen = len(self.tx_buffer)
         if buflen == 0:
             return ""
-        return str(100*self.tx_index/float(buflen))
+        return str(100 * self.tx_index / float(buflen))
 
 
     def set_pause(self, flag):
@@ -244,16 +244,16 @@ class SerialManagerClass:
                         # print "=========================== READY"
                         self.nRequested = self.TX_CHUNK_SIZE
                         #remove control chars
-                        chars = chars.replace(self.ready_char, "")
+                        chars = chars.replace(self.ready_char, b'')
                     ## assemble lines
                     self.rx_buffer += chars
                     while(1):  # process all lines in buffer
-                        posNewline = self.rx_buffer.find('\n')
+                        posNewline = self.rx_buffer.find(b'\n')
                         if posNewline == -1:
                             break  # no more complete lines
                         else:  # we got a line
                             line = self.rx_buffer[:posNewline]
-                            self.rx_buffer = self.rx_buffer[posNewline+1:]
+                            self.rx_buffer = self.rx_buffer[posNewline + 1:]
                         self.process_status_line(line)
                 else:
                     if self.nRequested == 0:
@@ -265,7 +265,7 @@ class SerialManagerClass:
                         try:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(
-                                self.tx_buffer[self.tx_index:self.tx_index+self.nRequested])
+                                self.tx_buffer[self.tx_index:self.tx_index + self.nRequested])
                             if time.time()-t_prewrite > 0.02:
                                 sys.stdout.write("WARN: write delay 1\n")
                                 sys.stdout.flush()
@@ -278,7 +278,7 @@ class SerialManagerClass:
                         self.nRequested -= actuallySent
                         if self.nRequested <= 0:
                             self.last_request_ready = 0  # make sure to request ready
-                    elif self.tx_buffer[self.tx_index] in ['!', '~']:  # send control chars no matter what
+                    elif self.tx_buffer[self.tx_index] in [b'!', b'~']:  # send control chars no matter what
                         try:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(self.tx_buffer[self.tx_index])
@@ -332,79 +332,79 @@ class SerialManagerClass:
 
 
     def process_status_line(self, line):
-        if '#' in line[:3]:
+        if b'#' in line[:3]:
             # print and ignore
-            sys.stdout.write(line + "\n")
+            sys.stdout.write(line.decode('utf-8') + '\n')
             sys.stdout.flush()
-        elif '^' in line:
+        elif b'^' in line:
             sys.stdout.write("\nFEC Correction!\n")
             sys.stdout.flush()
         else:
-            if '!' in line:
+            if b'!' in line:
                 # in stop mode
                 self.cancel_queue()
                 # not ready whenever in stop mode
                 self.status['ready'] = False
-                sys.stdout.write(line + "\n")
+                sys.stdout.write(line.decode('utf-8') + "\n")
                 sys.stdout.flush()
             else:
                 sys.stdout.write(".")
                 sys.stdout.flush()
 
-            if 'N' in line:
+            if b'N' in line:
                 self.status['bad_number_format_error'] = True
-            if 'E' in line:
+            if b'E' in line:
                 self.status['expected_command_letter_error'] = True
-            if 'U' in line:
+            if b'U' in line:
                 self.status['unsupported_statement_error'] = True
 
-            if 'B' in line:  # Stop: Buffer Overflow
+            if b'B' in line:  # Stop: Buffer Overflow
                 self.status['buffer_overflow'] = True
             else:
                 self.status['buffer_overflow'] = False
 
-            if 'T' in line:  # Stop: Transmission Error
+            if b'T' in line:  # Stop: Transmission Error
                 self.status['transmission_error'] = True
             else:
                 self.status['transmission_error'] = False
 
-            if 'P' in line:  # Stop: Power is off
+            if b'P' in line:  # Stop: Power is off
                 self.status['power_off'] = True
             else:
                 self.status['power_off'] = False
 
-            if 'L' in line:  # Stop: A limit was hit
+            if b'L' in line:  # Stop: A limit was hit
                 self.status['limit_hit'] = True
             else:
                 self.status['limit_hit'] = False
 
-            if 'R' in line:  # Stop: by serial requested
+            if b'R' in line:  # Stop: by serial requested
                 self.status['serial_stop_request'] = True
             else:
                 self.status['serial_stop_request'] = False
 
-            if 'D' in line:  # Warning: Door Open
+            if b'D' in line:  # Warning: Door Open
                 self.status['door_open'] = True
             else:
                 self.status['door_open'] = False
 
-            if 'C' in line:  # Warning: Chiller Off
+            if b'C' in line:  # Warning: Chiller Off
                 self.status['chiller_off'] = True
             else:
                 self.status['chiller_off'] = False
 
-            if 'X' in line:
-                self.status['x'] = line[line.find('X')+1:line.find('Y')]
+            if b'X' in line:
+                self.status['x'] = line[line.find(b'X') + 1:line.find(b'Y')].decode('utf-8')
             # else:
             #     self.status['x'] = False
 
-            if 'Y' in line:
-                self.status['y'] = line[line.find('Y')+1:line.find('V')]
+            if b'Y' in line:
+                self.status['y'] = line[line.find(b'Y') + 1:line.find(b'V')].decode('utf-8')
             # else:
             #     self.status['y'] = False
 
-            if 'V' in line:
-                self.status['firmware_version'] = line[line.find('V')+1:]
+            if b'V' in line:
+                self.status['firmware_version'] = line[line.find(b'V') + 1:].decode('utf-8')
 
 
 

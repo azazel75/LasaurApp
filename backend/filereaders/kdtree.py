@@ -22,7 +22,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-from copy import copy, deepcopy
+from copy import deepcopy
 
 class Hyperrectangle:
     '''an axis aligned bounding box of arbitrary dimension'''
@@ -39,7 +39,8 @@ class Hyperrectangle:
             elif pos[i]>self.max[i]: self.max[i]=pos[i]
 
     def distance_squared(self,pos):
-        '''return the distance squared to the nearest edge, or zero if pos lies within the hyperrectangle'''
+        '''return the distance squared to the nearest edge, or zero if pos lies
+        within the hyperrectangle'''
         result=0.0
         for i in range(self.dim):
             if pos[i]<self.min[i]:
@@ -89,7 +90,8 @@ class Node:
 
     def _str(self,level):
         s = '  '*level+str(self.dir)+' '+str(self.pos)+' '+str(self.rect)+'\n'
-        return s + ('' if self.left is None else 'L:'+self.left._str(level+1)) + ('' if self.right is None else 'R:'+self.right._str(level+1))
+        return s + ('' if self.left is None else 'L:'+self.left._str(level+1)) + \
+            ('' if self.right is None else 'R:'+self.right._str(level+1))
 
     def __str__(self):
         return self._str(0)
@@ -344,7 +346,8 @@ if __name__ == "__main__":
                 for p in self.points:
                     for d in self.d:
                         node, distsq = tree.nearest(p+d)
-                        s="%s %s %s %s\n%s"%(str(p+d), str(p), str(d), str(node.pos),str(tree.root))
+                        s = "%s %s %s %s\n%s" % (str(p+d), str(p), str(d),
+                                                 str(node.pos),str(tree.root))
                         self.assertListEqual(node.pos,p,msg=s)
                         self.assertListEqual(node.data,p)
                         self.assertAlmostEqual(distsq,d.dot(d),msg=s)
@@ -365,7 +368,8 @@ if __name__ == "__main__":
                 for p in self.points:
                     for d in self.d:
                         node, distsq = tree.nearest(p+d)
-                        s="%s %s %s %s\n%s"%(str(p+d), str(p), str(d), str(node.pos),str(tree.root))
+                        s = "%s %s %s %s\n%s" % (str(p+d), str(p), str(d),
+                                                 str(node.pos),str(tree.root))
                         self.assertListEqual(node.pos,p,msg=s)
                         self.assertListEqual(node.data,p)
                         self.assertAlmostEqual(distsq,d.dot(d),msg=s)
@@ -382,7 +386,8 @@ if __name__ == "__main__":
                 for p in self.points[:-1]: # all but last
                     for d in self.d:
                         node, distsq = tree.nearest(p+d)
-                        s="%s %s %s %s\n%s"%(str(p+d), str(p), str(d), str(node.pos),str(tree.root))
+                        s = "%s %s %s %s\n%s" % (str(p+d), str(p), str(d),
+                                                 str(node.pos),str(tree.root))
                         self.assertListEqual(node.pos,p,msg=s)
                         self.assertListEqual(node.data,p)
                         self.assertAlmostEqual(distsq,d.dot(d),msg=s)
@@ -428,7 +433,9 @@ if __name__ == "__main__":
                 node, distsq = tree.nearest(p)
             e=time()-s
             print("queries|tree size|tree height|empties|query load|query time")
-            print("{0:7d}|{2:9d}|{1.level:11d}|      0|{3:10.2f}|{4:10.1f}".format(qsize,tree,tsize,float(tree.count)/qsize,e))
+            print("{0:7d}|{2:9d}|{1.level:11d}|      0|{3:10.2f}|{4:10.1f}".format(
+                qsize, tree, tsize, float(tree.count) / qsize, e
+            ))
 
             tree.resetcounters()
             empty=[]
@@ -441,9 +448,14 @@ if __name__ == "__main__":
             for p in qpos:
                 node, distsq = tree.nearest(p)
             e2=time()-s
-            print("{0:7d}|{2:9d}|{1.level:11d}|      0|{3:10.2f}|{4:10.1f}".format(qsize,tree,tsize*10,float(tree.count)/qsize,e2))
+            print("{0:7d}|{2:9d}|{1.level:11d}|      0|{3:10.2f}|{4:10.1f}".format(
+                qsize, tree, tsize*10, float(tree.count) / qsize, e2
+            ))
 
-            self.assertLess(e2,3*e,msg="a 10x bigger tree shouldn't take more than 3x the time to query")
+            self.assertLess(
+                e2, 3*e,
+                msg="a 10x bigger tree shouldn't take more than 3x the time to query"
+            )
 
             for p in empty:
                 node, distsq = tree.nearest(p)
@@ -453,6 +465,9 @@ if __name__ == "__main__":
             for p in qpos:
                 node, distsq = tree.nearest(p,checkempty=True)
             e3=time()-s
-            print("{0:7d}|{2:9d}|{1.level:11d}|{5:7d}|{3:10.2f}|{4:10.1f}".format(qsize,tree,tsize*10,float(tree.count)/qsize,e3,tsize*10//emptyq))
+            print("{0:7d}|{2:9d}|{1.level:11d}|{5:7d}|{3:10.2f}|{4:10.1f}".format(
+                qsize, tree, tsize * 10, float(tree.count) / qsize, e3,
+                tsize * 10 // emptyq
+            ))
 
     unittest.main()
