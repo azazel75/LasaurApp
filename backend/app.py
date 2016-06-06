@@ -18,7 +18,7 @@ from flash import flash_upload, reset_atmega
 from build import build_firmware
 from filereaders import read_svg, read_dxf, read_ngc
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 APPNAME = "lasaurapp"
 VERSION = "14.11b"
@@ -105,10 +105,14 @@ def run_with_callback(host, port):
     server = make_server(host, port, handler, handler_class=HackedWSGIRequestHandler)
     server.timeout = 0.01
     server.quiet = True
-    print("Persistent storage root is: %s" % storage_dir())
+    msg = "Persistent storage root is: %s" % storage_dir()
+    print(msg)
+    log.info(msg)
     print("-----------------------------------------------------------------------------")
     print("Bottle server starting up ...")
-    print("Serial is set to %d bps" % BITSPERSECOND)
+    msg = "Serial is set to %d bps" % BITSPERSECOND
+    print(msg)
+    log.info(msg)
     print("Point your browser to: ")
     print("http://%s:%d/      (local)" % ('127.0.0.1', port))
     # if host == '':
@@ -141,6 +145,7 @@ def run_with_callback(host, port):
         except KeyboardInterrupt:
             break
     print("\nShutting down...")
+    log.info("Shutting down...")
     SerialManager.close()
 
 
@@ -234,7 +239,7 @@ def queue_save_handler():
         try:
             fp = open(filename, 'w')
             fp.write(job_data)
-            print("file saved: %s" % filename)
+            log.info("file saved: %s", filename)
             ret = '1'
         finally:
             fp.close()
