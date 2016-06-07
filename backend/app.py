@@ -239,12 +239,12 @@ def queue_save_handler():
         try:
             fp = open(filename, 'w')
             fp.write(job_data)
-            log.info("file saved: %s", filename)
+            log.info("File saved: %s", filename)
             ret = '1'
         finally:
             fp.close()
     else:
-        print("error: save failed, invalid POST request")
+        log.error("Save failed, invalid POST request")
     return ret
 
 @route('/queue/rm/:name')
@@ -256,7 +256,7 @@ def queue_rm_handler(name):
         if os.path.exists(filename):
             try:
                 os.remove(filename);
-                print("file deleted: %s" % filename)
+                log.info("File deleted: %s", filename)
                 ret = '1'
             finally:
                 pass
@@ -279,7 +279,7 @@ def queue_clear_handler():
             filename = os.path.join(storage_dir(), filename)
             try:
                 os.remove(filename);
-                print("file deleted: %s"  % filename)
+                log.info("File deleted: %s", filename)
                 ret = '1'
             finally:
                 pass
@@ -324,20 +324,19 @@ def stash_download():
     with fp:
         fp.write(filedata)
         fp.close()
-    print(filedata)
-    print("file stashed: %s" % os.path.basename(filename))
+    log.info("File stashed: %s", os.path.basename(filename))
     return os.path.basename(filename)
 
 @route('/download/:filename/:dlname')
 def download(filename, dlname):
-    print("requesting: %s" % filename)
+    log.info("Return requested file: %s", filename)
     return static_file(filename, root=tempfile.gettempdir(), download=dlname)
 
 
 @route('/serial/:connect')
 def serial_handler(connect):
     if connect == '1':
-        # print 'js is asking to connect serial'
+        log.debug('Client is asking to connect serial')
         if not SerialManager.is_connected():
             try:
                 global SERIAL_PORT, BITSPERSECOND, GUESS_PREFIX
@@ -351,10 +350,10 @@ def serial_handler(connect):
                 return ret
             except serial.SerialException:
                 SERIAL_PORT = None
-                print("Failed to connect to serial.")
+                log.exception("Failed to connect to serial.")
                 return ""
     elif connect == '0':
-        # print 'js is asking to close serial'
+        log.debug('Client is asking to close serial')
         if SerialManager.is_connected():
             if SerialManager.close(): return "1"
             else: return ""
@@ -363,7 +362,7 @@ def serial_handler(connect):
         if SerialManager.is_connected(): return "1"
         else: return ""
     else:
-        print('ambigious connect request from js: %s' % connect)
+        log.warn('Ambigious connect request from js: %s', connect)
         return ""
 
 
@@ -381,12 +380,12 @@ def set_pause(flag):
     # returns pause status
     if flag == '1':
         if SerialManager.set_pause(True):
-            print("pausing ...")
+            log.info("Pausing ...")
             return '1'
         else:
             return '0'
     elif flag == '0':
-        print("resuming ...")
+        log.info("Resuming ...")
         if SerialManager.set_pause(False):
             return '1'
         else:
@@ -452,12 +451,12 @@ def build_firmware_handler():
     source_dir = os.path.join(resources_dir(), 'firmware', 'src')
     return_code = build_firmware(source_dir, firmware_dir, buildname)
     if return_code != 0:
-        print(ret)
+        log.error("Firmware build error")
         ret.append('<h2>FAIL: build error!</h2>')
         ret.append('Syntax error maybe? Try builing in the terminal.')
         ret.append('<br><a href="/">return</a><br><br>')
     else:
-        print("SUCCESS: firmware built.")
+        log.info("SUCCESS: firmware built.")
         ret.append('<h2>SUCCESS: new firmware built!</h2>')
         ret.append('<br><a href="/flash_firmware/'+buildname+'.hex">Flash Now!</a><br><br>')
     return ''.join(ret)
@@ -494,7 +493,6 @@ def file_reader():
         dimensions = json.loads(dimensions)
     except TypeError:
         dimensions = None
-    # print "dims", dimensions[0], ":", dimensions[1]
 
 
     dpi_forced = None
@@ -508,9 +506,12 @@ def file_reader():
         optimize = bool(int(request.forms.get('optimize')))
     except:
         pass
+    log.info('Start processing file: "%s"', filename)
+    log.debug('Dimensions: "%s", dpi: "%s", optimize: "%s"',
+              dimensions, dpi_forced, optimize)
 
     if filename and filedata:
-        print("You uploaded %s (%d bytes)." % (filename, len(filedata)))
+        log.debug("You uploaded %s (%d bytes)", filename, len(filedata))
         if filename[-4:] in ['.dxf', '.DXF']:
             res = read_dxf(filedata, TOLERANCE, optimize)
         elif filename[-4:] in ['.svg', '.SVG']:
@@ -518,11 +519,11 @@ def file_reader():
         elif filename[-4:] in ['.ngc', '.NGC']:
             res = read_ngc(filedata, TOLERANCE, optimize)
         else:
-            print("error: unsupported file format")
+            log.error("Unsupported file format")
 
-        # print boundarys
         jsondata = json.dumps(res)
-        # print "returning %d items as %d bytes." % (len(res['boundarys']), len(jsondata))
+        log.debug("Returning %d items as %d bytes", len(res['boundarys']),
+                  len(jsondata))
         return jsondata
     return "You missed a field."
 
