@@ -1,0 +1,3 @@
+Stefan Hechenberger <stefan@nortd.com>
+
+for the others run "git shortlog -s" on the repository.
