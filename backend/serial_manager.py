@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+# :Project:   LasarApp -- serial communication management
+# :Created:   Sun Mar 18 18:04:23 2012 +0100
+# :Author:    Stefan Hechenberger <stefan@nortd.com>
+# :License:   GNU General Public License version 3 or later
+# :Copyright: © 2012-2016 Stefan Hechenberger <stefan@nortd.com> and others,
+#             see AUTHORS.txt
+#
+
 import os
 import sys
 import time
