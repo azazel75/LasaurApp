@@ -7,11 +7,15 @@
 #             see AUTHORS.txt
 #
 
+import logging
 import os
 import sys
 import time
+
 import serial
 from serial.tools import list_ports
+
+log = logging.getLogger(__name__)
 
 
 class SerialManagerClass:
@@ -73,14 +77,13 @@ class SerialManagerClass:
         ports = []
         if os.name == 'posix':
             iterator = sorted(list_ports.grep('tty'))
-            print("Found ports:")
+            log.debug("Found ports:")
             for port, desc, hwid in iterator:
                 ports.append(port)
-                print("%-20s" % (port,))
-                print("    desc: %s" % (desc,))
-                print("    hwid: %s" % (hwid,))
+                log.debug("%-20s", port)
+                log.debug("    desc: %s", desc)
+                log.debug("    hwid: %s", hwid)
         else:
-            # iterator = sorted(list_ports.grep(''))  # does not return USB-style
             # scan for available ports. return a list of tuples (num, name)
             available = []
             for i in range(24):
@@ -91,8 +94,8 @@ class SerialManagerClass:
                     s.close()
                 except serial.SerialException:
                     pass
-            print("Found ports:")
-            for n,s in available: print("(%d) %s" % (n,s))
+            log.debug("Found ports:")
+            for n,s in available: log.debug("(%d) %s", n, s)
         return ports
 
 
@@ -104,11 +107,11 @@ class SerialManagerClass:
                 for match_tuple in matched_ports:
                     if match_tuple:
                         return match_tuple[0]
-            print("No serial port match for anything like: " + search_regex)
+            log.debug("No serial port match for anything like: " + search_regex)
             return None
         else:
             # windows hack because pyserial does not enumerate USB-style com ports
-            print("Trying to find Controller ...")
+            log.info("Trying to find Controller ...")
             for i in range(24):
                 try:
                     s = serial.Serial(port=i, baudrate=baudrate, timeout=2.0)
@@ -176,7 +179,7 @@ class SerialManagerClass:
         if isinstance(gcode, str):
             gcode = gcode.encode('utf-8')
         lines = gcode.split(b'\n')
-        print("Adding to queue %s lines" % len(lines))
+        log.debug("Adding to queue %s lines" % len(lines))
         job_list = []
         for line in lines:
             line = line.strip()
