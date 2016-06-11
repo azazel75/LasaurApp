@@ -19,6 +19,15 @@ log = logging.getLogger(__name__)
 
 
 class SerialManagerClass:
+    """Manages the serial communication with the `ATmega`"""
+
+    TX_CHUNK_SIZE = 16
+    """This is the number of bytes to be written to the device in one
+        go. It needs to match the device.
+    """
+    RX_CHUNK_SIZE = 16
+    LASAURGRBL_FIRST_STRING = b"LasaurGrbl"
+
 
     def __init__(self):
         self.device = None
@@ -28,10 +37,6 @@ class SerialManagerClass:
         self.tx_index = 0
         self.remoteXON = True
 
-        # TX_CHUNK_SIZE - this is the number of bytes to be
-        # written to the device in one go. It needs to match the device.
-        self.TX_CHUNK_SIZE = 16
-        self.RX_CHUNK_SIZE = 16
         self.nRequested = 0
 
         # used for calculating percentage done
@@ -41,7 +46,6 @@ class SerialManagerClass:
         self.status = {}
         self.reset_status()
 
-        self.LASAURGRBL_FIRST_STRING = b"LasaurGrbl"
 
         self.fec_redundancy = 2  # use forward error correction
         # self.fec_redundancy = 1  # use error detection
