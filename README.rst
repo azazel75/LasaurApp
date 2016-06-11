@@ -56,7 +56,7 @@ processes. Besides this, html-based GUIs are just awesome :)
 How to Use this App
 -------------------
 
-* make sure you have Python 2.7
+* make sure you have Python 3.4+
 * run *python backend/app.py*
 * The GUI will open in a browser at *http://localhost:4444*
   (supported are Firefox, Chrome, and likely future Safari 6+ or IE 10+)
