@@ -35,7 +35,6 @@ class SerialManager:
         self.rx_buffer = bytearray()
         self.tx_buffer = bytearray()
         self.tx_index = 0
-        self.remoteXON = True
 
         self.nRequested = 0
 
@@ -132,7 +131,6 @@ class SerialManager:
         self.rx_buffer = bytearray()
         self.tx_buffer = bytearray()
         self.tx_index = 0
-        self.remoteXON = True
         self.reset_status()
 
         # Create serial device with both read timeout set to 0.
