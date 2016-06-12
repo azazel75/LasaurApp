@@ -7,6 +7,7 @@
 #             see AUTHORS.txt
 #
 
+import collections
 import logging
 import os
 import sys
@@ -17,6 +18,10 @@ from serial.tools import list_ports
 
 log = logging.getLogger(__name__)
 
+FEC_TYPES = collections.namedtuple(
+    'FecTypes',
+    ['NONE', 'ERROR_DETECTION', 'ERROR_CORRECTION']
+)(0, 1, 2)
 
 class SerialManager:
     """Manages the serial communication with the `ATmega`"""
@@ -196,7 +201,7 @@ class SerialManager:
                 if line != b'?':  # not ready unless just a ?-query
                     self.status['ready'] = False
 
-                if self.fec_redundancy > 0:  # using error correction
+                if self.fec_redundancy > FEC_TYPES.NONE: # using error correction
                     # prepend marker and checksum
                     checksum = 0
                     for c in line:
@@ -206,7 +211,7 @@ class SerialManager:
                                 checksum -= 128
                     checksum = (checksum >> 1) + 128
                     line_redundant = bytearray()
-                    for n in range(self.fec_redundancy - 1):
+                    if self.fec_redundancy == FEC_TYPES.ERROR_CORRECTION:
                         line_redundant += b'^' + bytes([checksum]) + line + b'\n'
                     line = line_redundant + b'*' + bytes([checksum]) + line
 
