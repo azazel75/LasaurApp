@@ -7,6 +7,26 @@
 #             see AUTHORS.txt
 #
 
+"""
+Serial Manager
+--------------
+
+This module manages the communication between the `frontend` and the `ATmega`
+that *speaks* only serial.
+
+An instance of the `SerialManager` is istanciated by the main module logic.
+Its primary functions are those of sending `GCODE` commands to te microcontroller
+and read back status information about the just executed operation and the
+various subsystems and sensors.
+
+The main stuff is in `SerialManager.queue_gcode` which is the entry point
+from the frontend logic that enqueues new commands to be sent.
+
+The other interesting code is in `SerialManager.send_queue_as_ready` method
+which polls the serial line for statuses and send new commands if there are any
+waiting in the send queue.
+"""
+
 import collections
 import logging
 import os
@@ -22,6 +42,19 @@ FEC_TYPES = collections.namedtuple(
     'FecTypes',
     ['NONE', 'ERROR_DETECTION', 'ERROR_CORRECTION']
 )(0, 1, 2)
+"""Types of Forward Error Correction.
+
+NONE
+  No error correction is applied or detected.
+
+ERROR_DETECTION
+  A checksum is added to the sent lines so that the other endpoint can detect
+  RX errors.
+
+ERROR_CORRECTION
+  Every sent line is doubled enabling some kind of error correction.
+"""
+
 
 class SerialManager:
     """Manages the serial communication with the `ATmega`"""
@@ -50,9 +83,12 @@ class SerialManager:
         self.status = {}
         self.reset_status()
 
+        self.fec_redundancy = FEC_TYPES.ERROR_CORRECTION
+        """Forward Error Detection.
 
-        self.fec_redundancy = 2  # use forward error correction
-        # self.fec_redundancy = 1  # use error detection
+        By default enable error correction.
+        See `FEC_TYPES`
+        """
 
         self.ready_char = b'\x12'
         self.request_ready_char = b'\x14'
