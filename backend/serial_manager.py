@@ -18,7 +18,7 @@ from serial.tools import list_ports
 log = logging.getLogger(__name__)
 
 
-class SerialManagerClass:
+class SerialManager:
     """Manages the serial communication with the `ATmega`"""
 
     TX_CHUNK_SIZE = 16
@@ -428,4 +428,4 @@ class SerialManagerClass:
 
 
 # singelton
-SerialManager = SerialManagerClass()
+SerialManager = SerialManager()
