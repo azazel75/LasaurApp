@@ -92,8 +92,6 @@ class HackedWSGIRequestHandler(WSGIRequestHandler):
         return str(self.client_address[0])
 
     def log_request(*args, **kw):
-        # if debug:
-            # return wsgiref.simple_server.WSGIRequestHandler.log_request(*args, **kw)
         pass
 
 
@@ -109,21 +107,15 @@ def run_with_callback(host, port):
     msg = "Persistent storage root is: %s" % storage_dir()
     print(msg)
     log.info(msg)
-    print("-----------------------------------------------------------------------------")
+    print("-" * 77)
     print("Bottle server starting up ...")
     msg = "Serial is set to %d bps" % BITSPERSECOND
     print(msg)
     log.info(msg)
     print("Point your browser to: ")
     print("http://%s:%d/      (local)" % ('127.0.0.1', port))
-    # if host == '':
-    #     try:
-    #         print "http://%s:%d/   (public)" % (socket.gethostbyname(socket.gethostname()), port)
-    #     except socket.gaierror:
-    #         # print "http://beaglebone.local:4444/      (public)"
-    #         pass
     print("Use Ctrl-C to quit.")
-    print("-----------------------------------------------------------------------------")
+    print("-" * 77)
     print()
     # auto-connect on startup
     global SERIAL_PORT
@@ -175,14 +167,16 @@ def static_img_handler(path):
 
 @route('/favicon.ico')
 def favicon_handler():
-    return static_file('favicon.ico', root=os.path.join(resources_dir(), 'frontend/img'))
+    return static_file('favicon.ico', root=os.path.join(resources_dir(),
+                                                        'frontend/img'))
 
 
 ### LIBRARY
 
 @route('/library/get/:path#.+#')
 def static_library_handler(path):
-    return static_file(path, root=os.path.join(resources_dir(), 'library'), mimetype='text/plain')
+    return static_file(path, root=os.path.join(resources_dir(), 'library'),
+                       mimetype='text/plain')
 
 @route('/library/list')
 def library_list_handler():
@@ -382,7 +376,7 @@ def get_status():
 
 @route('/pause/:flag')
 def set_pause(flag):
-    # returns pause status
+    """Returns pause status."""
     serial_manager = get_serial_manager()
     if flag == '1':
         if serial_manager.set_pause(True):
@@ -423,13 +417,15 @@ def flash_firmware_handler(firmware_file=FIRMWARE):
         comport_list = serial_manager.list_devices(BITSPERSECOND)
         for port in comport_list:
             print("Trying com port: %s" % port)
-            return_code = flash_upload(port, resources_dir(), firmware_file, HARDWARE)
+            return_code = flash_upload(port, resources_dir(), firmware_file,
+                                       HARDWARE)
             if return_code == 0:
                 print("Success with com port: %s" % port)
                 SERIAL_PORT = port
                 break
     else:
-        return_code = flash_upload(SERIAL_PORT, resources_dir(), firmware_file, HARDWARE)
+        return_code = flash_upload(SERIAL_PORT, resources_dir(), firmware_file,
+                                   HARDWARE)
     ret = []
     ret.append('Using com port: %s<br>' % (SERIAL_PORT))
     ret.append('Using firmware: %s<br>' % (firmware_file))
@@ -440,13 +436,17 @@ def flash_firmware_handler(firmware_file=FIRMWARE):
         return ''.join(ret)
     else:
         print("ERROR: Failed to flash Arduino.")
-        ret.append('<h2>Flashing Failed!</h2> Check terminal window for possible errors. ')
+        ret.append('<h2>Flashing Failed!</h2> Check terminal window for possible'
+                   ' errors. ')
         ret.append('Most likely LasaurApp could not find the right serial port.')
-        ret.append('<br><a href="/flash_firmware/'+firmware_file+'">try again</a> or <a href="/">return</a><br><br>')
+        ret.append('<br><a href="/flash_firmware/%s">try again</a> or <a href="'
+                   '/">return</a><br><br>' % firmware_file)
         if os.name != 'posix':
-            ret. append('If you know the COM ports the Arduino is connected to you can specifically select it here:')
+            ret. append('If you know the COM ports the Arduino is connected to '
+                        'you can specifically select it here:')
             for i in range(1,13):
-                ret. append('<br><a href="/flash_firmware?port=COM%s">COM%s</a>' % (i, i))
+                ret. append('<br><a href="/flash_firmware?port=COM%s">COM%s</a>'\
+                            % (i, i))
         return ''.join(ret)
 
 
