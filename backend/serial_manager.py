@@ -63,11 +63,22 @@ class SerialManager:
 
     TX_CHUNK_SIZE = 16
     """This is the number of bytes to be written to the device in one
-        go. It needs to match the device.
+        go. It needs to match the `firmware`.
     """
     RX_CHUNK_SIZE = 16
+    """Number of bytes read from the device in one go.
+    """
     LASAURGRBL_FIRST_STRING = b"LasaurGrbl"
-
+    """String to find at connection initialization time, sent by the `ATmega`.
+    """
+    READY_CHAR = b'\x12'
+    """Character sent by the `ATmega` in response to the reception of a
+    `REQUEST_READY_CHAR`, it's like a pong in a ping-pong protocol.
+    """
+    REQUEST_READY_CHAR = b'\x14'
+    """Character sent by this code to the `ATmega` to be sure that the other other
+    side is still functional, it like a ping in a ping-pong protocol.
+    """
 
     def __init__(self):
         self.device = None
@@ -83,6 +94,9 @@ class SerialManager:
 
         # status flags
         self.status = {}
+        """Dictionary member containing status information decoded by parsing the line
+        sent by the `ATmega`, see `process_status_line`.
+        """
         self.reset_status()
 
         self.fec_redundancy = FEC_TYPES.ERROR_CORRECTION
@@ -91,12 +105,7 @@ class SerialManager:
         By default enable error correction.
         See `FEC_TYPES`
         """
-
-        self.ready_char = b'\x12'
-        self.request_ready_char = b'\x14'
         self.last_request_ready = 0
-
-
 
     def reset_status(self):
         self.status = {
@@ -116,8 +125,6 @@ class SerialManager:
             'y': False,
             'firmware_version': None
         }
-
-
 
     def list_devices(self, baudrate):
         ports = []
@@ -143,8 +150,6 @@ class SerialManager:
             log.debug("Found ports:")
             for n,s in available: log.debug("(%d) %s", n, s)
         return ports
-
-
 
     def match_device(self, search_regex, baudrate):
         if os.name == 'posix':
@@ -221,6 +226,8 @@ class SerialManager:
 
 
     def queue_gcode(self, gcode):
+        """Processes a group of `GCODE` instructions, add redundancy for error
+        detection and correction and queue them."""
         if isinstance(gcode, str):
             gcode = gcode.encode('utf-8')
         lines = gcode.split(b'\n')
@@ -261,6 +268,7 @@ class SerialManager:
 
 
     def cancel_queue(self):
+        """Removes all the instructions from the queue"""
         self.tx_buffer = bytearray()
         self.tx_index = 0
         self.job_active = False
@@ -291,18 +299,20 @@ class SerialManager:
 
 
     def send_queue_as_ready(self):
-        """Continuously call this to keep processing queue."""
+        """This is the communication workhorse, it reads and sends return-terminated
+        lines via the serial interface. It gets polled from the main app code.
+        """
         if self.device and not self.status['paused']:
             try:
                 ### receiving
                 chars = self.device.read(self.RX_CHUNK_SIZE)
                 if len(chars) > 0:
                     ## check for data request
-                    if self.ready_char in chars:
+                    if self.READY_CHAR in chars:
                         # print "=========================== READY"
                         self.nRequested = self.TX_CHUNK_SIZE
-                        #remove control chars
-                        chars = chars.replace(self.ready_char, b'')
+                        # remove control chars
+                        chars = chars.replace(self.READY_CHAR, b'')
                     ## assemble lines
                     self.rx_buffer += chars
                     while(1):  # process all lines in buffer
@@ -356,7 +366,7 @@ class SerialManager:
                             # print "=========================== REQUEST READY"
                             try:
                                 t_prewrite = time.time()
-                                actuallySent = self.device.write(self.request_ready_char)
+                                actuallySent = self.device.write(self.REQUEST_READY_CHAR)
                                 if time.time()-t_prewrite > 0.02:
                                     sys.stdout.write("WARN: write delay 3\n")
                                     sys.stdout.flush()
@@ -463,10 +473,6 @@ class SerialManager:
 
             if b'V' in line:
                 self.status['firmware_version'] = line[line.find(b'V') + 1:].decode('utf-8')
-
-
-
-
 
 def get_serial_manager():
     global SERIAL_MANAGER
