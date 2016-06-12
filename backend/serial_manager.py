@@ -55,6 +55,8 @@ ERROR_CORRECTION
   Every sent line is doubled enabling some kind of error correction.
 """
 
+SERIAL_MANAGER = None
+
 
 class SerialManager:
     """Manages the serial communication with the `ATmega`"""
@@ -466,5 +468,8 @@ class SerialManager:
 
 
 
-# singelton
-SerialManager = SerialManager()
+def get_serial_manager():
+    global SERIAL_MANAGER
+    if not SERIAL_MANAGER:
+        SERIAL_MANAGER = SerialManager()
+    return SERIAL_MANAGER
