@@ -322,6 +322,7 @@ class SerialManager:
                         else:  # we got a line
                             line = self.rx_buffer[:posNewline]
                             self.rx_buffer = self.rx_buffer[posNewline + 1:]
+                            log.debug("RX < DATA: %s" % line.decode('ascii'))
                         self.process_status_line(line)
                 else:
                     if self.nRequested == 0:
@@ -334,14 +335,15 @@ class SerialManager:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(
                                 self.tx_buffer[self.tx_index:self.tx_index + self.nRequested])
+                            log.debug("TX > DATA: %s",
+                                      self.tx_buffer[self.tx_index:self.tx_index +
+                                                     actuallySent].decode('ascii'))
                             if time.time()-t_prewrite > 0.02:
-                                sys.stdout.write("WARN: write delay 1\n")
-                                sys.stdout.flush()
+                                log.warn("TX > DATA: Delay ")
                         except serial.SerialTimeoutException:
                             # skip, report
                             actuallySent = 0  # assume nothing has been sent
-                            sys.stdout.write("\nsend_queue_as_ready: writeTimeoutError\n")
-                            sys.stdout.flush()
+                            log.exception("TX > DATA: Timeout!")
                         self.tx_index += actuallySent
                         self.nRequested -= actuallySent
                         if self.nRequested <= 0:
@@ -351,12 +353,10 @@ class SerialManager:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(self.tx_buffer[self.tx_index])
                             if time.time()-t_prewrite > 0.02:
-                                sys.stdout.write("WARN: write delay 2\n")
-                                sys.stdout.flush()
+                                log.warn("TX > CONTROL_CHAR: Delay ")
                         except serial.SerialTimeoutException:
                             actuallySent = 0  # assume nothing has been sent
-                            sys.stdout.write("\nsend_queue_as_ready: writeTimeoutError\n")
-                            sys.stdout.flush()
+                            log.exception("TX > CONTROL_CHAR: Timeout!")
                         self.tx_index += actuallySent
                     else:
                         if (time.time()-self.last_request_ready) > 2.0:
@@ -368,13 +368,12 @@ class SerialManager:
                                 t_prewrite = time.time()
                                 actuallySent = self.device.write(self.REQUEST_READY_CHAR)
                                 if time.time()-t_prewrite > 0.02:
-                                    sys.stdout.write("WARN: write delay 3\n")
-                                    sys.stdout.flush()
+                                    log.warn("TX > REQUEST_READY: Delay ")
                             except serial.SerialTimeoutException:
                                 # skip, report
-                                actuallySent = self.nRequested  # pyserial does not report this sufficiently
-                                sys.stdout.write("\nsend_queue_as_ready: writeTimeoutError, on ready request\n")
-                                sys.stdout.flush()
+                                actuallySent = self.nRequested  # pyserial
+                                # does not report this sufficiently
+                                log.exception("TX > REQUEST_READY: Timeout!")
                             if actuallySent == 1:
                                 self.last_request_ready = time.time()
 
@@ -385,7 +384,8 @@ class SerialManager:
                         self.tx_buffer = ""
                         self.tx_index = 0
                         self.job_active = False
-                        # ready whenever a job is done, including a status request via '?'
+                        # ready whenever a job is done, including a status
+                        # request via '?'
                         self.status['ready'] = True
             except OSError:
                 # Serial port appears closed => reset
