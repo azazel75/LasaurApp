@@ -33,6 +33,17 @@ Stefan`__:
 
 __ https://github.com/stefanix/LasaurApp
 
+Documentation
+-------------
+
+I'm creating a small documentation site while I'm reading and updating the
+code here and there. You can have a look at it `in the project docs`__
+
+__ http://azazel75.github.io/LasaurApp/index.html
+
+Some preliminary informations
+-----------------------------
+
 When running on the Driveboard people can start using the 'saur'
 directly from their laptop without having to setup any software or
 drivers. This is done this way because we imagine laser cutters being
@@ -57,7 +68,9 @@ How to Use this App
 -------------------
 
 * make sure you have Python 3.4+
-* run *python backend/app.py*
+* run ``make`` to install the necessary dependencies
+* run a ``source env/bin/activate`` to enable the local Python virtual env
+* run ``python backend/app.py``
 * The GUI will open in a browser at *http://localhost:4444*
   (supported are Firefox, Chrome, and likely future Safari 6+ or IE 10+)
 

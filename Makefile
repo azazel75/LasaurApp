@@ -19,7 +19,7 @@ REQUIREMENTS_TIMESTAMP := $(VENVDIR)/requirements.timestamp
 REQUIREMENTS := requirements.txt
 DOCS_REQUIREMENTS_TIMESTAMP := $(VENVDIR)/docs-requirements.timestamp
 DOCS_REQUIREMENTS := docs-requirements.txt
-
+REPO := $(shell git remote get-url --push origin)
 
 .PHONY: all
 all: virtualenv
@@ -84,3 +84,17 @@ docs: $(DOCS_REQUIREMENTS_TIMESTAMP)
 	@echo "Compiling documentation..."
 	@source $(VENVDIR)/bin/activate && cd docs &&  $(MAKE) html
 	@$(PYTHON) -m webbrowser docs/_build/html/index.html
+
+help::
+	@echo -e "push-docs\n\t push documentation to gh-pages"
+
+.PHONY: push-docs
+.ONESHELL:
+push-docs: docs
+	@echo "Pushing docs to gh-pages branch"
+	cd docs/_build/html
+	touch .nojekyll
+	git init
+	git add .
+	git commit -m "Deployed to Github Pages"
+	git push --force --quiet $(REPO) master:gh-pages
