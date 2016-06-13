@@ -13,10 +13,10 @@ import webbrowser
 from bottle import *
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
-from serial_manager import get_serial_manager
-from flash import flash_upload, reset_atmega
-from build import build_firmware
-from filereaders import read_svg, read_dxf, read_ngc
+from .serial_manager import get_serial_manager
+from .flash import flash_upload, reset_atmega
+from .build import build_firmware
+from .filereaders import read_svg, read_dxf, read_ngc
 
 log = logging.getLogger(__name__)
 
@@ -807,7 +807,3 @@ def main():
                 run_with_callback('', NETWORK_PORT)
             else:
                 run_with_callback('127.0.0.1', NETWORK_PORT)
-
-
-if __name__ == '__main__':
-    main()

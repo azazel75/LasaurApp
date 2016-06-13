@@ -1,2 +1,2 @@
 #!/bin/bash
-python backend/app.py
+./env/bin/python -m backend
