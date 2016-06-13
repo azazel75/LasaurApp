@@ -229,7 +229,7 @@ class SerialManager:
         """Processes a group of `GCODE` instructions, add redundancy for error
         detection and correction and queue them."""
         if isinstance(gcode, str):
-            gcode = gcode.encode('utf-8')
+            gcode = gcode.encode('ascii')
         lines = gcode.split(b'\n')
         log.debug("Adding to queue %s lines" % len(lines))
         job_list = []
