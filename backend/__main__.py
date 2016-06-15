@@ -8,13 +8,27 @@
 
 import argparse
 import logging
+import logging.handlers
+import sys
 
-def setup_logging():
+from . import __version__, GUESS_PREFIX
+
+
+def setup_logging(debug=False, syslog=False):
     "Configure application logging."
-
-    level = logging.DEBUG if __debug__ else logging.INFO
-    logging.basicConfig(level=level,
-                        format='%(asctime)-15s:%(levelname)-5s: %(message)s')
+    debug = debug or __debug__
+    params = {}
+    params['level'] = logging.DEBUG if debug else logging.INFO
+    if syslog:
+        params['format'] = '%(levelname)-5s: %(message)s'
+        if sys.platform == 'linux':
+            address = '/dev/log'
+        if sys.platform == 'darwin':
+            address = '/var/run/syslog'
+        params['handlers'] = [logging.handlers.SysLogHandler(address)]
+    else:
+        params['format'] = '%(asctime)-15s:%(levelname)-5s: %(message)s'
+    logging.basicConfig(**params)
     log = logging.getLogger(__name__)
     log.debug('Debug log')
     log.info('Info log')
