@@ -567,11 +567,11 @@ def main(args):
         # for details see: http://www.nathandumont.com/node/250
         if os.path.exists("/sys/kernel/debug/omap_mux/uart1_txd"):
             # echo 0 > /sys/kernel/debug/omap_mux/uart1_txd
-            fw = file("/sys/kernel/debug/omap_mux/uart1_txd", "w")
-            fw.write("%X" % (0))
+            fw = open("/sys/kernel/debug/omap_mux/uart1_txd", "w")
+            fw.write("%X" % 0)
             fw.close()
             # echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd
-            fw = file("/sys/kernel/debug/omap_mux/uart1_rxd", "w")
+            fw = open("/sys/kernel/debug/omap_mux/uart1_rxd", "w")
             fw.write("%X" % ((1 << 5) | 0))
             fw.close()
 
@@ -596,20 +596,20 @@ def main(args):
             os.system("echo gpio > %s" % (pin46))
 
         try:
-            fw = file("/sys/class/gpio/export", "w")
-            fw.write("%d" % (71))
+            fw = open("/sys/class/gpio/export", "w")
+            fw.write("71" )
             fw.close()
         except IOError:
             # probably already exported
             pass
         # set the gpio pin to output
         # echo out > /sys/class/gpio/gpio71/direction
-        fw = file("/sys/class/gpio/gpio71/direction", "w")
+        fw = open("/sys/class/gpio/gpio71/direction", "w")
         fw.write("out")
         fw.close()
         # set the gpio pin high
         # echo 1 > /sys/class/gpio/gpio71/value
-        fw = file("/sys/class/gpio/gpio71/value", "w")
+        fw = open("/sys/class/gpio/gpio71/value", "w")
         fw.write("1")
         fw.flush()
         fw.close()
@@ -626,20 +626,20 @@ def main(args):
             os.system("echo gpio > %s" % (pin44))
 
         try:
-            fw = file("/sys/class/gpio/export", "w")
-            fw.write("%d" % (73))
+            fw = open("/sys/class/gpio/export", "w")
+            fw.write("73")
             fw.close()
         except IOError:
             # probably already exported
             pass
         # set the gpio pin to output
         # echo out > /sys/class/gpio/gpio73/direction
-        fw = file("/sys/class/gpio/gpio73/direction", "w")
+        fw = open("/sys/class/gpio/gpio73/direction", "w")
         fw.write("out")
         fw.close()
         # set the gpio pin high
         # echo 1 > /sys/class/gpio/gpio73/value
-        fw = file("/sys/class/gpio/gpio73/value", "w")
+        fw = open("/sys/class/gpio/gpio73/value", "w")
         fw.write("1")
         fw.flush()
         fw.close()
@@ -654,21 +654,21 @@ def main(args):
             os.system("echo gpio > %s" % (pin39))
 
         try:
-            fw = file("/sys/class/gpio/export", "w")
-            fw.write("%d" % (76))
+            fw = open("/sys/class/gpio/export", "w")
+            fw.write("76")
             fw.close()
         except IOError:
             # probably already exported
             pass
         # set the gpio pin to input
-        fw = file("/sys/class/gpio/gpio76/direction", "w")
+        fw = open("/sys/class/gpio/gpio76/direction", "w")
         fw.write("in")
         fw.close()
         # set the gpio pin high
-        fw = file("/sys/class/gpio/gpio76/value", "r")
+        fw = open("/sys/class/gpio/gpio76/value", "r")
         ret = fw.read()
         fw.close()
-        print("Stepper driver configure pin is: %s" % str(ret))
+        log.info("Stepper driver configure pin is: %s", str(ret))
 
     elif args.raspberrypi:
         HARDWARE = 'raspberrypi'
