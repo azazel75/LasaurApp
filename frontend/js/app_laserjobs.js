@@ -1,5 +1,3 @@
-
-
 var minNumPassWidgets = 3;
 var maxNumPassWidgets = 32;
 var preview_canvas_obj = null;
@@ -32,12 +30,6 @@ function refresh_preview(reload_data, read_passes_widget) {
   }
   DataHandler.draw(preview_canvas_obj, app_settings.to_canvas_scale);
   DataHandler.draw_bboxes(preview_canvas_obj, app_settings.to_canvas_scale);
-  // var stats = GcodeReader.getStats();
-  // var length = stats.cuttingPathLength;
-  // var duration = stats.estimatedTime;
-  // $('#previe_stats').html("~" + duration.toFixed(1) + "min");
-  // $().uxmessage('notice', "Total cutting path is: " + (length/1000.0).toFixed(2) +
-  //               "m. Estimated Time: " + duration.toFixed(1) + "min");
   var total_length = DataHandler.getJobPathLength();
   if (total_length > 0) {
     $('#stats_after_name').html('length: '+(total_length/1000).toFixed(1)+'m');
