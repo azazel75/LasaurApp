@@ -53,10 +53,13 @@ def storage_dir():
         # # NSApplicationSupportDirectory = 14
         # # NSUserDomainMask = 1
         # # True for expanding the tilde into a fully qualified path
-        # appdata = path.join(NSSearchPathForDirectoriesInDomains(14, 1, True)[0], APPNAME)
-        directory = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', COMPANY_NAME, APPNAME)
+        # appdata = path.join(NSSearchPathForDirectoriesInDomains(14,
+        # 1, True)[0], APPNAME)
+        directory = os.path.join(os.path.expanduser('~'), 'Library', 'Application '
+                                 'Support', COMPANY_NAME, APPNAME)
     elif sys.platform == 'win32':
-        directory = os.path.join(os.path.expandvars('%APPDATA%'), COMPANY_NAME, APPNAME)
+        directory = os.path.join(os.path.expandvars('%APPDATA%'), COMPANY_NAME,
+                                 APPNAME)
     else:
         directory = os.path.join(os.path.expanduser('~'), "." + APPNAME)
 
@@ -189,11 +192,9 @@ def decode_filename(name):
     index = name.find('-')
     return base64.urlsafe_b64decode(name[index+1:])
 
-
 @route('/queue/get/:name#.+#')
 def static_queue_handler(name):
     return static_file(name, root=storage_dir(), mimetype='text/plain')
-
 
 @route('/queue/list')
 def library_list_handler():
