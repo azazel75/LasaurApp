@@ -13,6 +13,7 @@ import webbrowser
 from bottle import *
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
+from . import __version__, GUESS_PREFIX
 from .serial_manager import get_serial_manager
 from .flash import flash_upload, reset_atmega
 from .build import build_firmware
@@ -21,7 +22,7 @@ from .filereaders import read_svg, read_dxf, read_ngc
 log = logging.getLogger(__name__)
 
 APPNAME = "lasaurapp"
-VERSION = "14.11b"
+VERSION = __version__
 COMPANY_NAME = "com.nortd.labs"
 SERIAL_PORT = None
 BITSPERSECOND = 57600
@@ -31,17 +32,6 @@ CONFIG_FILE = "lasaurapp.conf"
 COOKIE_KEY = 'secret_key_jkn23489hsdf'
 FIRMWARE = "LasaurGrbl.hex"
 TOLERANCE = 0.08
-
-
-if os.name == 'nt': #sys.platform == 'win32':
-    GUESS_PREFIX = "Arduino"
-elif os.name == 'posix':
-    if sys.platform == "linux" or sys.platform == "linux2":
-        GUESS_PREFIX = "2341"  # match by arduino VID
-    else:
-        GUESS_PREFIX = "tty.usbmodem"
-else:
-    GUESS_PREFIX = "no prefix"
 
 
 def resources_dir():
