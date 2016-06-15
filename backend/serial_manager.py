@@ -189,7 +189,7 @@ class SerialManager:
         # many bytes were actually written if this is different from requested.
         # Work around: use a big enough timeout and a small enough chunk size.
         self.device = serial.Serial(port, baudrate, timeout=0, write_timeout=1)
-
+        log.debug('Connect: (%s) %r', bool(self.device), self.device)
 
     def close(self):
         if self.device:
@@ -389,9 +389,11 @@ class SerialManager:
                         self.status['ready'] = True
             except OSError:
                 # Serial port appears closed => reset
+                log.exception('Error in sqar()')
                 self.close()
             except ValueError:
                 # Serial port appears closed => reset
+                log.exception('Error in sqar()')
                 self.close()
         else:
             # serial disconnected
