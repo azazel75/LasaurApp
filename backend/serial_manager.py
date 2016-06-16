@@ -409,22 +409,18 @@ class SerialManager:
     def process_status_line(self, line):
         if b'#' in line[:3]:
             # print and ignore
-            sys.stdout.write(line.decode('utf-8') + '\n')
-            sys.stdout.flush()
+            log.debug('Status: ignored %s', line.decode('ascii'))
         elif b'^' in line:
-            sys.stdout.write("\nFEC Correction!\n")
-            sys.stdout.flush()
+            log.debug("Status: FEC Correction")
         else:
             if b'!' in line:
                 # in stop mode
                 self.cancel_queue()
                 # not ready whenever in stop mode
                 self.status['ready'] = False
-                sys.stdout.write(line.decode('utf-8') + "\n")
-                sys.stdout.flush()
+                log.info('Status: stop')
             else:
-                sys.stdout.write(".")
-                sys.stdout.flush()
+                log.info("Status: run")
 
             if b'N' in line:
                 self.status['bad_number_format_error'] = True
