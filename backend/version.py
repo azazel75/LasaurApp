@@ -7,4 +7,4 @@
 #             see AUTHORS.txt
 #
 
-__version__ = "14.11b"
+__version__ = "14.11b-azazel"
