@@ -19,7 +19,7 @@ REQUIREMENTS_TIMESTAMP := $(VENVDIR)/requirements.timestamp
 REQUIREMENTS := requirements.txt
 DOCS_REQUIREMENTS_TIMESTAMP := $(VENVDIR)/docs-requirements.timestamp
 DOCS_REQUIREMENTS := docs-requirements.txt
-REPO := $(shell git remote get-url --push origin)
+REPO := $(shell git config --get remote.origin.url)
 
 .PHONY: all
 all: virtualenv
