@@ -334,10 +334,14 @@ class SerialManager:
                         try:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(
-                                self.tx_buffer[self.tx_index:self.tx_index + self.nRequested])
+                                self.tx_buffer[self.tx_index:self.tx_index +
+                                               self.nRequested])
                             log.debug("TX > DATA: %s",
                                       self.tx_buffer[self.tx_index:self.tx_index +
-                                                     actuallySent].decode('ascii'))
+                                                     actuallySent].decode(
+                                                         'ascii',
+                                                         errors='backslashreplace')
+                            )
                             if time.time()-t_prewrite > 0.02:
                                 log.warn("TX > DATA: Delay ")
                         except serial.SerialTimeoutException:
