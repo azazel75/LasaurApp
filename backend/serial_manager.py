@@ -352,7 +352,8 @@ class SerialManager:
                         self.nRequested -= actuallySent
                         if self.nRequested <= 0:
                             self.last_request_ready = 0  # make sure to request ready
-                    elif self.tx_buffer[self.tx_index] in [b'!', b'~']:  # send control chars no matter what
+                    elif self.tx_buffer[self.tx_index] in [b'!', b'~']:  # send
+                        # control chars no matter what
                         try:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(self.tx_buffer[self.tx_index])
