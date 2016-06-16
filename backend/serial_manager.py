@@ -381,7 +381,7 @@ class SerialManager:
                     if self.job_active:
                         # print "\nG-code stream finished!"
                         # print "(LasaurGrbl may take some extra time to finalize)"
-                        self.tx_buffer = ""
+                        self.tx_buffer = bytearray()
                         self.tx_index = 0
                         self.job_active = False
                         # ready whenever a job is done, including a status
