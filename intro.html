@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>LasaurApp &mdash; LasaurApp 14.11b documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '14.11b',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="LasaurApp 14.11b documentation" href="index.html" />
+    <link rel="next" title="API" href="api.html" />
+    <link rel="prev" title="Welcome to LasaurApp’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="lasaurapp">
+<h1>LasaurApp<a class="headerlink" href="#lasaurapp" title="Permalink to this headline">¶</a></h1>
+<p>LasaurApp is the official <a class="reference external" href="http://lasersaur.com">Lasersaur</a> app. It
+has all the functionality to operate this kind of laser cutter:</p>
+<ul class="simple">
+<li>load vector files and send them to the Lasersaur;</li>
+<li>file support for SVG, <a class="reference internal" href="glossary.html#term-g-code"><code class="xref any std std-term docutils literal"><span class="pre">G-code</span></code></a> (subset), DXF (subset);</li>
+<li>GUI widget to move the laser head;</li>
+<li>pausing/continuing a job;</li>
+<li>firmware flashing;</li>
+<li>handy <a class="reference internal" href="glossary.html#term-g-code"><code class="xref any std std-term docutils literal"><span class="pre">G-code</span></code></a> programs for the optics calibration process.</li>
+</ul>
+<p>This app is written mostly in cross-platform, cross-browser Javascript
+and Python. This allows for very flexible setup. The backend can
+either run directly on the Lasersaur (Driveboard) or on the client
+computer. The frontend runs in a web browser either on the same client
+computer or on a tablet computer.</p>
+</div>
+<div class="section" id="architecture">
+<h1>Architecture<a class="headerlink" href="#architecture" title="Permalink to this headline">¶</a></h1>
+<p>The software system is comprised of three parts that reside each in its own
+directory:</p>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">/firmware</span></code></dt>
+<dd>Contains the C language sources and the already compiled binaries of the
+modified <a class="reference external" href="https://github.com/grbl/grbl">grbl</a> <a class="reference internal" href="glossary.html#term-cnc"><code class="xref any std std-term docutils literal"><span class="pre">CNC</span></code></a> controller software that is installed on the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a>
+chip that manages all the circuitry on the <a class="reference internal" href="glossary.html#term-driveboard"><code class="xref any std std-term docutils literal"><span class="pre">DriveBoard</span></code></a>;</dd>
+<dt><code class="docutils literal"><span class="pre">/backend</span></code></dt>
+<dd>Contains the Python language sources of the service that runs on the <a class="reference internal" href="glossary.html#term-bbb"><code class="xref any std std-term docutils literal"><span class="pre">BBB</span></code></a>.
+It communicates on one side via a serial line to the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a> and on the
+other side with the client that runs the GUI in the web browser;</dd>
+<dt><code class="docutils literal"><span class="pre">/frontend</span></code></dt>
+<dd>Contains the HTML and JavaScript code used to run the GUI in the web
+browser. It communicates with the <a class="reference internal" href="glossary.html#term-backend"><code class="xref any std std-term docutils literal"><span class="pre">backend</span></code></a> using the HTTP protocol.</dd>
+</dl>
+<p>Overally the system can be represented in a simple graph as follows:</p>
+<a class="reference internal image-reference" href="_images/aafig-06f51cbc05ce78aafb001e98d53328cf130fdc61.svg"><img height="526.4000000000001" src="_images/aafig-06f51cbc05ce78aafb001e98d53328cf130fdc61.svg" width="392.00000000000006" /></a>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">LasaurApp</a></li>
+<li><a class="reference internal" href="#architecture">Architecture</a></li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to LasaurApp&#8217;s documentation!</a></li>
+      <li>Next: <a href="api.html" title="next chapter">API</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/intro.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Stefan Hechenberger.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/intro.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

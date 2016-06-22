@@ -1,0 +1,225 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>API &mdash; LasaurApp 14.11b documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '14.11b',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="LasaurApp 14.11b documentation" href="index.html" />
+    <link rel="next" title="Glossary of terms" href="glossary.html" />
+    <link rel="prev" title="LasaurApp" href="intro.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-backend.serial_manager">
+<span id="api"></span><h1>API<a class="headerlink" href="#module-backend.serial_manager" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="serial-manager">
+<h2>Serial Manager<a class="headerlink" href="#serial-manager" title="Permalink to this headline">¶</a></h2>
+<p>This module manages the communication between the <a class="reference internal" href="glossary.html#term-frontend"><code class="xref any std std-term docutils literal"><span class="pre">frontend</span></code></a> and the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a>
+that <em>speaks</em> only serial.</p>
+<p>An instance of the <a class="reference internal" href="#backend.serial_manager.SerialManager" title="backend.serial_manager.SerialManager"><code class="xref any py py-class docutils literal"><span class="pre">SerialManager</span></code></a> is istanciated by the main module logic.
+Its primary functions are those of sending <a class="reference internal" href="glossary.html#term-gcode"><code class="xref any std std-term docutils literal"><span class="pre">GCODE</span></code></a> commands to te
+microcontroller and read back status information about the just executed
+operation and the various subsystems and sensors.</p>
+<p>The main stuff is in <a class="reference internal" href="#backend.serial_manager.SerialManager.queue_gcode" title="backend.serial_manager.SerialManager.queue_gcode"><code class="xref any py py-meth docutils literal"><span class="pre">SerialManager.queue_gcode</span></code></a> which is the entry point
+from the frontend logic that enqueues new commands to be sent.</p>
+<p>The other interesting code is in <a class="reference internal" href="#backend.serial_manager.SerialManager.send_queue_as_ready" title="backend.serial_manager.SerialManager.send_queue_as_ready"><code class="xref any py py-meth docutils literal"><span class="pre">SerialManager.send_queue_as_ready</span></code></a> method
+which polls the serial line for statuses and send new commands if there are any
+waiting in the send queue.</p>
+<p>The protocol employed uses two special control characters (<a class="reference internal" href="glossary.html#term-ascii"><code class="xref any std std-term docutils literal"><span class="pre">ASCII</span></code></a>&#8216;s <code class="docutils literal"><span class="pre">DC2</span></code>
+and <code class="docutils literal"><span class="pre">DC4</span></code>, used as <code class="docutils literal"><span class="pre">READY_CHAR</span></code> and <code class="docutils literal"><span class="pre">REQUEST_READY_CHAR</span></code> in the code) to
+control the flow on the wire. <code class="docutils literal"><span class="pre">REQUEST_READY_CHAR</span></code> is sent by the tx part of
+<a class="reference internal" href="#backend.serial_manager.SerialManager.send_queue_as_ready" title="backend.serial_manager.SerialManager.send_queue_as_ready"><code class="xref any py py-meth docutils literal"><span class="pre">SerialManager.send_queue_as_ready</span></code></a> and then the next chunk of data (as much
+as <a class="reference internal" href="#backend.serial_manager.SerialManager.TX_CHUNK_SIZE" title="backend.serial_manager.SerialManager.TX_CHUNK_SIZE"><code class="xref any py py-attr docutils literal"><span class="pre">SerialManager.TX_CHUNK_SIZE</span></code></a>) is sent as soon as a <code class="docutils literal"><span class="pre">READY_CHAR</span></code> is read
+from the rx part of the same method. It&#8217;s a bit like half an <a class="reference internal" href="glossary.html#term-xon-xoff"><code class="xref any std std-term docutils literal"><span class="pre">XON/XOFF</span></code></a> flow
+control with the logic reversed.</p>
+<p>THE <a class="reference internal" href="glossary.html#term-gcode"><code class="xref any std std-term docutils literal"><span class="pre">GCODE</span></code></a> commands are sent as-is or an error detection byte or a so-called
+error correction line is added to the bytes to be sent.</p>
+<dl class="data">
+<dt id="backend.serial_manager.FEC_TYPES">
+<code class="descclassname">backend.serial_manager.</code><code class="descname">FEC_TYPES</code><em class="property"> = FecTypes(NONE=0, ERROR_DETECTION=1, ERROR_CORRECTION=2)</em><a class="headerlink" href="#backend.serial_manager.FEC_TYPES" title="Permalink to this definition">¶</a></dt>
+<dd><p>Types of Forward Error Correction.</p>
+<dl class="docutils">
+<dt>NONE</dt>
+<dd>No error correction is applied or detected.</dd>
+<dt>ERROR_DETECTION</dt>
+<dd>A checksum is added to the sent lines so that the other endpoint can detect
+RX errors.</dd>
+<dt>ERROR_CORRECTION</dt>
+<dd>Every sent line is doubled enabling some kind of error correction.</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="backend.serial_manager.SerialManager">
+<em class="property">class </em><code class="descclassname">backend.serial_manager.</code><code class="descname">SerialManager</code><a class="reference internal" href="_modules/backend/serial_manager.html#SerialManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backend.serial_manager.SerialManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages the serial communication with the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a></p>
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.LASAURGRBL_FIRST_STRING">
+<code class="descname">LASAURGRBL_FIRST_STRING</code><em class="property"> = b'LasaurGrbl'</em><a class="headerlink" href="#backend.serial_manager.SerialManager.LASAURGRBL_FIRST_STRING" title="Permalink to this definition">¶</a></dt>
+<dd><p>String to find at connection initialization time, sent by the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.READY_CHAR">
+<code class="descname">READY_CHAR</code><em class="property"> = b'\x12'</em><a class="headerlink" href="#backend.serial_manager.SerialManager.READY_CHAR" title="Permalink to this definition">¶</a></dt>
+<dd><p>Character sent by the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a> in response to the reception of a
+<a class="reference internal" href="#backend.serial_manager.SerialManager.REQUEST_READY_CHAR" title="backend.serial_manager.SerialManager.REQUEST_READY_CHAR"><code class="xref any py py-attr docutils literal"><span class="pre">REQUEST_READY_CHAR</span></code></a>, it&#8217;s like a pong in a ping-pong protocol.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.REQUEST_READY_CHAR">
+<code class="descname">REQUEST_READY_CHAR</code><em class="property"> = b'\x14'</em><a class="headerlink" href="#backend.serial_manager.SerialManager.REQUEST_READY_CHAR" title="Permalink to this definition">¶</a></dt>
+<dd><p>Character sent by this code to the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a> to be sure that the other other
+side is still functional, it like a ping in a ping-pong protocol.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.RX_CHUNK_SIZE">
+<code class="descname">RX_CHUNK_SIZE</code><em class="property"> = 16</em><a class="headerlink" href="#backend.serial_manager.SerialManager.RX_CHUNK_SIZE" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of bytes read from the device in one go.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.TX_CHUNK_SIZE">
+<code class="descname">TX_CHUNK_SIZE</code><em class="property"> = 16</em><a class="headerlink" href="#backend.serial_manager.SerialManager.TX_CHUNK_SIZE" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is the number of bytes to be written to the device in one
+go. It needs to match the <a class="reference internal" href="glossary.html#term-firmware"><code class="xref any std std-term docutils literal"><span class="pre">firmware</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="backend.serial_manager.SerialManager.cancel_queue">
+<code class="descname">cancel_queue</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/serial_manager.html#SerialManager.cancel_queue"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backend.serial_manager.SerialManager.cancel_queue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes all the instructions from the queue</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.fec_redundancy">
+<code class="descname">fec_redundancy</code><em class="property"> = None</em><a class="headerlink" href="#backend.serial_manager.SerialManager.fec_redundancy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward Error Detection.</p>
+<p>By default enable error correction.
+See <a class="reference internal" href="#backend.serial_manager.FEC_TYPES" title="backend.serial_manager.FEC_TYPES"><code class="xref any py py-data docutils literal"><span class="pre">FEC_TYPES</span></code></a></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="backend.serial_manager.SerialManager.process_status_line">
+<code class="descname">process_status_line</code><span class="sig-paren">(</span><em>line</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/serial_manager.html#SerialManager.process_status_line"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backend.serial_manager.SerialManager.process_status_line" title="Permalink to this definition">¶</a></dt>
+<dd><p>Process a line read from the serial interface and transform single byte
+status reports into flags inside the status mapping.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="backend.serial_manager.SerialManager.queue_gcode">
+<code class="descname">queue_gcode</code><span class="sig-paren">(</span><em>gcode</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/serial_manager.html#SerialManager.queue_gcode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backend.serial_manager.SerialManager.queue_gcode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Processes a group of <a class="reference internal" href="glossary.html#term-gcode"><code class="xref any std std-term docutils literal"><span class="pre">GCODE</span></code></a> instructions, add redundancy for error
+detection and correction and queue them.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="backend.serial_manager.SerialManager.send_queue_as_ready">
+<code class="descname">send_queue_as_ready</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/serial_manager.html#SerialManager.send_queue_as_ready"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backend.serial_manager.SerialManager.send_queue_as_ready" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is the communication workhorse, it reads and sends return-terminated
+lines via the serial interface. It gets polled from the main app code.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="backend.serial_manager.SerialManager.status">
+<code class="descname">status</code><em class="property"> = None</em><a class="headerlink" href="#backend.serial_manager.SerialManager.status" title="Permalink to this definition">¶</a></dt>
+<dd><p>Dictionary member containing status information decoded by parsing the line
+sent by the <a class="reference internal" href="glossary.html#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a>, see <a class="reference internal" href="#backend.serial_manager.SerialManager.process_status_line" title="backend.serial_manager.SerialManager.process_status_line"><code class="xref any py py-meth docutils literal"><span class="pre">process_status_line</span></code></a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">API</a><ul>
+<li><a class="reference internal" href="#serial-manager">Serial Manager</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter">LasaurApp</a></li>
+      <li>Next: <a href="glossary.html" title="next chapter">Glossary of terms</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/api.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Stefan Hechenberger.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/api.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

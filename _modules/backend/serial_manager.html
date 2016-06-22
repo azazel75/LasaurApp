@@ -1,0 +1,582 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>backend.serial_manager &mdash; LasaurApp 14.11b documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '14.11b',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="LasaurApp 14.11b documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for backend.serial_manager</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># :Project:   LasarApp -- serial communication management</span>
+<span class="c1"># :Created:   Sun Mar 18 18:04:23 2012 +0100</span>
+<span class="c1"># :Author:    Stefan Hechenberger &lt;stefan@nortd.com&gt;</span>
+<span class="c1"># :License:   GNU General Public License version 3 or later</span>
+<span class="c1"># :Copyright: © 2012-2016 Stefan Hechenberger &lt;stefan@nortd.com&gt; and others,</span>
+<span class="c1">#             see AUTHORS.txt</span>
+<span class="c1">#</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Serial Manager</span>
+<span class="sd">--------------</span>
+
+<span class="sd">This module manages the communication between the `frontend` and the `ATmega`</span>
+<span class="sd">that *speaks* only serial.</span>
+
+<span class="sd">An instance of the `SerialManager` is istanciated by the main module logic.</span>
+<span class="sd">Its primary functions are those of sending `GCODE` commands to te</span>
+<span class="sd">microcontroller and read back status information about the just executed</span>
+<span class="sd">operation and the various subsystems and sensors.</span>
+
+<span class="sd">The main stuff is in `SerialManager.queue_gcode` which is the entry point</span>
+<span class="sd">from the frontend logic that enqueues new commands to be sent.</span>
+
+<span class="sd">The other interesting code is in `SerialManager.send_queue_as_ready` method</span>
+<span class="sd">which polls the serial line for statuses and send new commands if there are any</span>
+<span class="sd">waiting in the send queue.</span>
+
+<span class="sd">The protocol employed uses two special control characters (`ASCII`&#39;s ``DC2``</span>
+<span class="sd">and ``DC4``, used as ``READY_CHAR`` and ``REQUEST_READY_CHAR`` in the code) to</span>
+<span class="sd">control the flow on the wire. ``REQUEST_READY_CHAR`` is sent by the tx part of</span>
+<span class="sd">`SerialManager.send_queue_as_ready` and then the next chunk of data (as much</span>
+<span class="sd">as `SerialManager.TX_CHUNK_SIZE`) is sent as soon as a ``READY_CHAR`` is read</span>
+<span class="sd">from the rx part of the same method. It&#39;s a bit like half an `XON/XOFF` flow</span>
+<span class="sd">control with the logic reversed.</span>
+
+<span class="sd">THE `GCODE` commands are sent as-is or an error detection byte or a so-called</span>
+<span class="sd">error correction line is added to the bytes to be sent.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">import</span> <span class="nn">serial</span>
+<span class="kn">from</span> <span class="nn">serial.tools</span> <span class="kn">import</span> <span class="n">list_ports</span>
+
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="n">FEC_TYPES</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s1">&#39;FecTypes&#39;</span><span class="p">,</span>
+    <span class="p">[</span><span class="s1">&#39;NONE&#39;</span><span class="p">,</span> <span class="s1">&#39;ERROR_DETECTION&#39;</span><span class="p">,</span> <span class="s1">&#39;ERROR_CORRECTION&#39;</span><span class="p">]</span>
+<span class="p">)(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="sd">&quot;&quot;&quot;Types of Forward Error Correction.</span>
+
+<span class="sd">NONE</span>
+<span class="sd">  No error correction is applied or detected.</span>
+
+<span class="sd">ERROR_DETECTION</span>
+<span class="sd">  A checksum is added to the sent lines so that the other endpoint can detect</span>
+<span class="sd">  RX errors.</span>
+
+<span class="sd">ERROR_CORRECTION</span>
+<span class="sd">  Every sent line is doubled enabling some kind of error correction.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">SERIAL_MANAGER</span> <span class="o">=</span> <span class="bp">None</span>
+
+
+<div class="viewcode-block" id="SerialManager"><a class="viewcode-back" href="../../api.html#backend.serial_manager.SerialManager">[docs]</a><span class="k">class</span> <span class="nc">SerialManager</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Manages the serial communication with the `ATmega`&quot;&quot;&quot;</span>
+
+    <span class="n">TX_CHUNK_SIZE</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="sd">&quot;&quot;&quot;This is the number of bytes to be written to the device in one</span>
+<span class="sd">        go. It needs to match the `firmware`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">RX_CHUNK_SIZE</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="sd">&quot;&quot;&quot;Number of bytes read from the device in one go.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">LASAURGRBL_FIRST_STRING</span> <span class="o">=</span> <span class="n">b</span><span class="s2">&quot;LasaurGrbl&quot;</span>
+    <span class="sd">&quot;&quot;&quot;String to find at connection initialization time, sent by the `ATmega`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">READY_CHAR</span> <span class="o">=</span> <span class="n">b</span><span class="s1">&#39;</span><span class="se">\x12</span><span class="s1">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Character sent by the `ATmega` in response to the reception of a</span>
+<span class="sd">    `REQUEST_READY_CHAR`, it&#39;s like a pong in a ping-pong protocol.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">REQUEST_READY_CHAR</span> <span class="o">=</span> <span class="n">b</span><span class="s1">&#39;</span><span class="se">\x14</span><span class="s1">&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Character sent by this code to the `ATmega` to be sure that the other other</span>
+<span class="sd">    side is still functional, it like a ping in a ping-pong protocol.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># used for calculating percentage done</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_active</span> <span class="o">=</span> <span class="bp">False</span>
+
+        <span class="c1"># status flags</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="sd">&quot;&quot;&quot;Dictionary member containing status information decoded by parsing the line</span>
+<span class="sd">        sent by the `ATmega`, see `process_status_line`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reset_status</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fec_redundancy</span> <span class="o">=</span> <span class="n">FEC_TYPES</span><span class="o">.</span><span class="n">ERROR_CORRECTION</span>
+        <span class="sd">&quot;&quot;&quot;Forward Error Detection.</span>
+
+<span class="sd">        By default enable error correction.</span>
+<span class="sd">        See `FEC_TYPES`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_request_ready</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">reset_status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;ready&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>  <span class="c1"># turns True by querying status</span>
+            <span class="s1">&#39;paused&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>  <span class="c1"># this is also a control flag</span>
+            <span class="s1">&#39;buffer_overflow&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;transmission_error&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;bad_number_format_error&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;expected_command_letter_error&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;unsupported_statement_error&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;power_off&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;limit_hit&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;serial_stop_request&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;door_open&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;chiller_off&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s1">&#39;firmware_version&#39;</span><span class="p">:</span> <span class="bp">None</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">list_devices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">baudrate</span><span class="p">):</span>
+        <span class="n">ports</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+            <span class="n">iterator</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">list_ports</span><span class="o">.</span><span class="n">grep</span><span class="p">(</span><span class="s1">&#39;tty&#39;</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found ports:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">port</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">hwid</span> <span class="ow">in</span> <span class="n">iterator</span><span class="p">:</span>
+                <span class="n">ports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">port</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%-20s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;    desc: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;    hwid: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hwid</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># scan for available ports. return a list of tuples (num, name)</span>
+            <span class="n">available</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">24</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">s</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">Serial</span><span class="p">(</span><span class="n">port</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">baudrate</span><span class="o">=</span><span class="n">baudrate</span><span class="p">)</span>
+                    <span class="n">ports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">portstr</span><span class="p">)</span>
+                    <span class="n">available</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">portstr</span><span class="p">))</span>
+                    <span class="n">s</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialException</span><span class="p">:</span>
+                    <span class="k">pass</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found ports:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">s</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span> <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;(</span><span class="si">%d</span><span class="s2">) </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ports</span>
+
+    <span class="k">def</span> <span class="nf">match_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">search_regex</span><span class="p">,</span> <span class="n">baudrate</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+            <span class="n">matched_ports</span> <span class="o">=</span> <span class="n">list_ports</span><span class="o">.</span><span class="n">grep</span><span class="p">(</span><span class="n">search_regex</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">matched_ports</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">match_tuple</span> <span class="ow">in</span> <span class="n">matched_ports</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">match_tuple</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="n">match_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No serial port match for anything like: &quot;</span> <span class="o">+</span> <span class="n">search_regex</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># windows hack because pyserial does not enumerate USB-style com ports</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Trying to find Controller ...&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">24</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">s</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">Serial</span><span class="p">(</span><span class="n">port</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">baudrate</span><span class="o">=</span><span class="n">baudrate</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+                    <span class="n">lasaur_hello</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">lasaur_hello</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">LASAURGRBL_FIRST_STRING</span><span class="p">)</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">portstr</span>
+                    <span class="n">s</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialException</span><span class="p">:</span>
+                    <span class="k">pass</span>
+            <span class="k">return</span> <span class="bp">None</span>
+
+
+    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">baudrate</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reset_status</span><span class="p">()</span>
+
+        <span class="c1"># Create serial device with both read timeout set to 0.</span>
+        <span class="c1"># This results in the read() being non-blocking</span>
+        <span class="c1"># Write on the other hand uses a large timeout but should not be blocking</span>
+        <span class="c1"># much because we ask it only to write TX_CHUNK_SIZE at a time.</span>
+        <span class="c1"># BUG WARNING: the pyserial write function does not report how</span>
+        <span class="c1"># many bytes were actually written if this is different from requested.</span>
+        <span class="c1"># Work around: use a big enough timeout and a small enough chunk size.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">Serial</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">baudrate</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">write_timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Connect: (</span><span class="si">%s</span><span class="s1">) </span><span class="si">%r</span><span class="s1">&#39;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flushOutput</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flushInput</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;ready&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">False</span>
+
+    <span class="k">def</span> <span class="nf">is_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_hardware_status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_queue_empty</span><span class="p">():</span>
+            <span class="c1"># trigger a status report</span>
+            <span class="c1"># will update for the next status request</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">queue_gcode</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;?&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span>
+
+
+    <span class="k">def</span> <span class="nf">flush_input</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flushInput</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">flush_output</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flushOutput</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="SerialManager.queue_gcode"><a class="viewcode-back" href="../../api.html#backend.serial_manager.SerialManager.queue_gcode">[docs]</a>    <span class="k">def</span> <span class="nf">queue_gcode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gcode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Processes a group of `GCODE` instructions, add redundancy for error</span>
+<span class="sd">        detection and correction and queue them.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">gcode</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">gcode</span> <span class="o">=</span> <span class="n">gcode</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">)</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">gcode</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adding to queue </span><span class="si">%s</span><span class="s2"> lines&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+        <span class="n">job_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">line</span> <span class="o">==</span> <span class="n">b</span><span class="s1">&#39;&#39;</span> <span class="ow">or</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="s1">&#39;%&#39;</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="s1">&#39;!&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cancel_queue</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reset_status</span><span class="p">()</span>
+                <span class="n">job_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;!&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">line</span> <span class="o">!=</span> <span class="n">b</span><span class="s1">&#39;?&#39;</span><span class="p">:</span>  <span class="c1"># not ready unless just a ?-query</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;ready&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fec_redundancy</span> <span class="o">&gt;</span> <span class="n">FEC_TYPES</span><span class="o">.</span><span class="n">NONE</span><span class="p">:</span> <span class="c1"># using error correction</span>
+                    <span class="c1"># prepend marker and checksum</span>
+                    <span class="n">checksum</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">c</span> <span class="o">&gt;</span> <span class="nb">ord</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39; &#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">c</span> <span class="o">!=</span> <span class="nb">ord</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;~&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">c</span> <span class="o">!=</span> <span class="nb">ord</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;!&#39;</span><span class="p">):</span> <span class="c1"># ignore 32 and lower, ~, !</span>
+                            <span class="n">checksum</span> <span class="o">+=</span> <span class="n">c</span>
+                            <span class="k">if</span> <span class="n">checksum</span> <span class="o">&gt;=</span> <span class="mi">128</span><span class="p">:</span>
+                                <span class="n">checksum</span> <span class="o">-=</span> <span class="mi">128</span>
+                    <span class="n">checksum</span> <span class="o">=</span> <span class="p">(</span><span class="n">checksum</span> <span class="o">&gt;&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">128</span>
+                    <span class="n">line_redundant</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fec_redundancy</span> <span class="o">==</span> <span class="n">FEC_TYPES</span><span class="o">.</span><span class="n">ERROR_CORRECTION</span><span class="p">:</span>
+                        <span class="n">line_redundant</span> <span class="o">+=</span> <span class="n">b</span><span class="s1">&#39;^&#39;</span> <span class="o">+</span> <span class="nb">bytes</span><span class="p">([</span><span class="n">checksum</span><span class="p">])</span> <span class="o">+</span> <span class="n">line</span> <span class="o">+</span> <span class="n">b</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span>
+                    <span class="n">line</span> <span class="o">=</span> <span class="n">line_redundant</span> <span class="o">+</span> <span class="n">b</span><span class="s1">&#39;*&#39;</span> <span class="o">+</span> <span class="nb">bytes</span><span class="p">([</span><span class="n">checksum</span><span class="p">])</span> <span class="o">+</span> <span class="n">line</span>
+
+                <span class="n">job_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+        <span class="n">gcode_processed</span> <span class="o">=</span> <span class="n">b</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">job_list</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span> <span class="o">+=</span> <span class="n">gcode_processed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_active</span> <span class="o">=</span> <span class="bp">True</span></div>
+
+
+<div class="viewcode-block" id="SerialManager.cancel_queue"><a class="viewcode-back" href="../../api.html#backend.serial_manager.SerialManager.cancel_queue">[docs]</a>    <span class="k">def</span> <span class="nf">cancel_queue</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Removes all the instructions from the queue&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_active</span> <span class="o">=</span> <span class="bp">False</span></div>
+
+
+    <span class="k">def</span> <span class="nf">is_queue_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">get_queue_percentage_done</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">buflen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">buflen</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="mi">100</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">buflen</span><span class="p">))</span>
+
+
+    <span class="k">def</span> <span class="nf">set_pause</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flag</span><span class="p">):</span>
+        <span class="c1"># returns pause status</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_queue_empty</span><span class="p">():</span>
+            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">flag</span><span class="p">:</span>  <span class="c1"># pause</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;paused&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="k">return</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>     <span class="c1"># unpause</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;paused&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="k">return</span> <span class="bp">False</span>
+
+
+<div class="viewcode-block" id="SerialManager.send_queue_as_ready"><a class="viewcode-back" href="../../api.html#backend.serial_manager.SerialManager.send_queue_as_ready">[docs]</a>    <span class="k">def</span> <span class="nf">send_queue_as_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;This is the communication workhorse, it reads and sends return-terminated</span>
+<span class="sd">        lines via the serial interface. It gets polled from the main app code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;paused&#39;</span><span class="p">]:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1">### receiving</span>
+                <span class="n">chars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">RX_CHUNK_SIZE</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chars</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1">## check for data request</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">READY_CHAR</span> <span class="ow">in</span> <span class="n">chars</span><span class="p">:</span>
+                        <span class="c1"># print &quot;=========================== READY&quot;</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">TX_CHUNK_SIZE</span>
+                        <span class="c1"># remove control chars</span>
+                        <span class="n">chars</span> <span class="o">=</span> <span class="n">chars</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">READY_CHAR</span><span class="p">,</span> <span class="n">b</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+                    <span class="c1">## assemble lines</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span> <span class="o">+=</span> <span class="n">chars</span>
+                    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>  <span class="c1"># process all lines in buffer</span>
+                        <span class="n">posNewline</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">posNewline</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                            <span class="k">break</span>  <span class="c1"># no more complete lines</span>
+                        <span class="k">else</span><span class="p">:</span>  <span class="c1"># we got a line</span>
+                            <span class="n">line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span><span class="p">[:</span><span class="n">posNewline</span><span class="p">]</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rx_buffer</span><span class="p">[</span><span class="n">posNewline</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;RX &lt; DATA: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">process_status_line</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.001</span><span class="p">)</span>  <span class="c1"># no rx/tx, rest a bit</span>
+
+                <span class="c1">### sending</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">t_prewrite</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                            <span class="n">actuallySent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">+</span>
+                                               <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span><span class="p">])</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;TX &gt; DATA: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">+</span>
+                                                     <span class="n">actuallySent</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span>
+                                                         <span class="s1">&#39;ascii&#39;</span><span class="p">,</span>
+                                                         <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;backslashreplace&#39;</span><span class="p">)</span>
+                            <span class="p">)</span>
+                            <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span><span class="o">-</span><span class="n">t_prewrite</span> <span class="o">&gt;</span> <span class="mf">0.02</span><span class="p">:</span>
+                                <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;TX &gt; DATA: Delay &quot;</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialTimeoutException</span><span class="p">:</span>
+                            <span class="c1"># skip, report</span>
+                            <span class="n">actuallySent</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># assume nothing has been sent</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;TX &gt; DATA: Timeout!&quot;</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">+=</span> <span class="n">actuallySent</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">-=</span> <span class="n">actuallySent</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">last_request_ready</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># make sure to request ready</span>
+                    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="n">b</span><span class="s1">&#39;!&#39;</span><span class="p">,</span> <span class="n">b</span><span class="s1">&#39;~&#39;</span><span class="p">]:</span>  <span class="c1"># send</span>
+                        <span class="c1"># control chars no matter what</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">t_prewrite</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                            <span class="n">actuallySent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t_prewrite</span> <span class="o">&gt;</span> <span class="mf">0.02</span><span class="p">:</span>
+                                <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;TX &gt; CONTROL_CHAR: Delay &quot;</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialTimeoutException</span><span class="p">:</span>
+                            <span class="n">actuallySent</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># assume nothing has been sent</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;TX &gt; CONTROL_CHAR: Timeout!&quot;</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">+=</span> <span class="n">actuallySent</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_request_ready</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">2.0</span><span class="p">:</span>
+                            <span class="c1"># ask to send a ready byte</span>
+                            <span class="c1"># only ask for this when sending is on hold</span>
+                            <span class="c1"># only ask once (and after a big time out)</span>
+                            <span class="c1"># print &quot;=========================== REQUEST READY&quot;</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="n">t_prewrite</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+                                <span class="n">actuallySent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">REQUEST_READY_CHAR</span><span class="p">)</span>
+                                <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t_prewrite</span> <span class="o">&gt;</span> <span class="mf">0.02</span><span class="p">:</span>
+                                    <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;TX &gt; REQUEST_READY: Delay &quot;</span><span class="p">)</span>
+                            <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialTimeoutException</span><span class="p">:</span>
+                                <span class="c1"># skip, report</span>
+                                <span class="n">actuallySent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nRequested</span>  <span class="c1"># pyserial</span>
+                                <span class="c1"># does not report this sufficiently</span>
+                                <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;TX &gt; REQUEST_READY: Timeout!&quot;</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">actuallySent</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">last_request_ready</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_active</span><span class="p">:</span>
+                        <span class="c1"># print &quot;\nG-code stream finished!&quot;</span>
+                        <span class="c1"># print &quot;(LasaurGrbl may take some extra time to finalize)&quot;</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tx_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">tx_index</span> <span class="o">=</span> <span class="mi">0</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">job_active</span> <span class="o">=</span> <span class="bp">False</span>
+                        <span class="c1"># ready whenever a job is done, including a status</span>
+                        <span class="c1"># request via &#39;?&#39;</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;ready&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="c1"># Serial port appears closed =&gt; reset</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;Error in sqar()&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="c1"># Serial port appears closed =&gt; reset</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;Error in sqar()&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># serial disconnected</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;ready&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span></div>
+
+
+
+<div class="viewcode-block" id="SerialManager.process_status_line"><a class="viewcode-back" href="../../api.html#backend.serial_manager.SerialManager.process_status_line">[docs]</a>    <span class="k">def</span> <span class="nf">process_status_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Process a line read from the serial interface and transform single byte</span>
+<span class="sd">        status reports into flags inside the status mapping.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;#&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">[:</span><span class="mi">3</span><span class="p">]:</span>
+            <span class="c1"># print and ignore</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Status: ignored </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ascii&#39;</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">b</span><span class="s1">&#39;^&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Status: FEC Correction&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;!&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="c1"># in stop mode</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cancel_queue</span><span class="p">()</span>
+                <span class="c1"># not ready whenever in stop mode</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;ready&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Status: stop&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Status: run&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;N&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;bad_number_format_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;E&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;expected_command_letter_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;U&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;unsupported_statement_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;B&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Stop: Buffer Overflow</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;buffer_overflow&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;buffer_overflow&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;T&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Stop: Transmission Error</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;transmission_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;transmission_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;P&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Stop: Power is off</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;power_off&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;power_off&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;L&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Stop: A limit was hit</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;limit_hit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;limit_hit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;R&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Stop: by serial requested</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;serial_stop_request&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;serial_stop_request&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;D&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Warning: Door Open</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;door_open&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;door_open&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;C&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>  <span class="c1"># Warning: Chiller Off</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;chiller_off&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;chiller_off&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;X&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;X&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;Y&#39;</span><span class="p">)]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="c1"># else:</span>
+            <span class="c1">#     self.status[&#39;x&#39;] = False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;Y&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;Y&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;V&#39;</span><span class="p">)]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+            <span class="c1"># else:</span>
+            <span class="c1">#     self.status[&#39;y&#39;] = False</span>
+
+            <span class="k">if</span> <span class="n">b</span><span class="s1">&#39;V&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="s1">&#39;firmware_version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">b</span><span class="s1">&#39;V&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span></div></div>
+
+<span class="k">def</span> <span class="nf">get_serial_manager</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">SERIAL_MANAGER</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">SERIAL_MANAGER</span><span class="p">:</span>
+        <span class="n">SERIAL_MANAGER</span> <span class="o">=</span> <span class="n">SerialManager</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">SERIAL_MANAGER</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Stefan Hechenberger.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

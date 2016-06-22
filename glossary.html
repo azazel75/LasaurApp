@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Glossary of terms &mdash; LasaurApp 14.11b documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '14.11b',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="LasaurApp 14.11b documentation" href="index.html" />
+    <link rel="prev" title="API" href="api.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="glossary-of-terms">
+<h1>Glossary of terms<a class="headerlink" href="#glossary-of-terms" title="Permalink to this headline">¶</a></h1>
+<dl class="glossary docutils">
+<dt id="term-ascii">ASCII</dt>
+<dd>The <a class="reference external" href="https://en.wikipedia.org/wiki/ASCII">&#8220;American Standard Code for Information Interchange&#8221;</a> character
+encoding standard used to send text characters in binary format.</dd>
+<dt id="term-atmega">ATmega</dt>
+<dd>The microcontroller controls the <a class="reference internal" href="#term-driveboard"><code class="xref any std std-term docutils literal"><span class="pre">DriveBoard</span></code></a>
+It is an <a class="reference external" href="http://www.mouser.com/ds/2/36/atmel-8271-8-bit-avr-microcontroller-atmega48a-48p-365589.pdf">Atmel ATmega328P</a> chip that integrates a CPU and severarl
+Input/Output subsystems like a serial interface, <a class="reference internal" href="#term-pwm"><code class="xref any std std-term docutils literal"><span class="pre">PWM</span></code></a> generation and
+analog-to-digital signal conversion.</dd>
+<dt id="term-backend">backend</dt>
+<dd>The Python code program that runs on the <a class="reference internal" href="#term-bbb"><code class="xref any std std-term docutils literal"><span class="pre">BBB</span></code></a> board. It&#8217;s
+available on the &#8216;backend&#8217; subfolder of the repository.</dd>
+<dt id="term-bbb">BBB</dt>
+<dd>The BeagleBone Black board that runs GNU/Linux and the <a class="reference internal" href="#term-backend"><code class="xref any std std-term docutils literal"><span class="pre">backend</span></code></a>
+software and connects to the LAN via its Ethernet socket.</dd>
+<dt id="term-cnc">CNC</dt>
+<dd>A <a class="reference external" href="https://en.wikipedia.org/wiki/Numerical_control">Computerized Numerical Control</a> machine, like the Lasersaur.</dd>
+<dt id="term-driveboard">DriveBoard</dt>
+<dd>The printed circuit board were all the control logic electronics reside.
+See the <a class="reference external" href="https://github.com/nortd/lasersaur/wiki/driveboard">appropriate page on the LaserSaur manual</a></dd>
+<dt id="term-firmware">firmware</dt>
+<dd>The C code program that runs on the <a class="reference internal" href="#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a> microcontroller. It&#8217;s
+available on the &#8216;firmware&#8217; subfolder of the repository.</dd>
+<dt id="term-frontend">frontend</dt>
+<dd>The Javascript code that runs the LasaurApp in the browser. It&#8217;s
+available on the &#8216;frontend&#8217; subfolder of the repository.</dd>
+<dt id="term-g-code">G-code</dt>
+<dt id="term-gcode">GCODE</dt>
+<dd>A simple language that defines the atomic operations performed by the
+cutter. This ranges from movements, to the cut operations, to status
+request, to the (dis)abilitation of the various subsystems. See the
+<a class="reference external" href="https://github.com/nortd/lasersaur/wiki/gcode">specific page on the LaserSaur manual</a> for further details.</dd>
+<dt id="term-laser-tube">Laser Tube</dt>
+<dd>The CO2 laser generator which is the heart of the LaserSaur.</dd>
+<dt id="term-pwm">PWM</dt>
+<dd>The <a class="reference external" href="https://en.wikipedia.org/wiki/Pulse-width_modulation">Pulse-Width Modulation</a> is a modulation tecnique where the
+amplitude (the height of the wave form) remains constant and instead the
+it&#8217;s the <em>duty-cycle</em> that may change from a period to another.  The
+<a class="reference internal" href="#term-atmega"><code class="xref any std std-term docutils literal"><span class="pre">ATmega</span></code></a> on the <a class="reference internal" href="#term-driveboard"><code class="xref any std std-term docutils literal"><span class="pre">DriveBoard</span></code></a> is able to emit souch kind of signal which
+can be used to control the power output of the <a class="reference internal" href="#term-laser-tube"><code class="xref any std std-term docutils literal"><span class="pre">laser</span> <span class="pre">tube</span></code></a>.</dd>
+<dt id="term-xon-xoff">XON/XOFF</dt>
+<dd>A <a class="reference external" href="https://en.wikipedia.org/wiki/Software_flow_control">software flow control</a> method which uses a pair of <a class="reference internal" href="#term-ascii"><code class="xref any std std-term docutils literal"><span class="pre">ASCII</span></code></a>
+characters as a &#8220;semaphore&#8221; to control the flow of characters
+transmitted over a serial line.</dd>
+</dl>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api.html" title="previous chapter">API</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/glossary.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Stefan Hechenberger.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/glossary.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
