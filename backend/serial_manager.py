@@ -30,7 +30,6 @@ waiting in the send queue.
 import collections
 import logging
 import os
-import sys
 import time
 
 import serial
@@ -250,7 +249,7 @@ class SerialManager:
                     # prepend marker and checksum
                     checksum = 0
                     for c in line:
-                        if c > ord(b' ') and c != ord(b'~') and c != ord(b'!'):  #ignore 32 and lower, ~, !
+                        if c > ord(b' ') and c != ord(b'~') and c != ord(b'!'): # ignore 32 and lower, ~, !
                             checksum += c
                             if checksum >= 128:
                                 checksum -= 128
@@ -315,7 +314,7 @@ class SerialManager:
                         chars = chars.replace(self.READY_CHAR, b'')
                     ## assemble lines
                     self.rx_buffer += chars
-                    while(1):  # process all lines in buffer
+                    while True:  # process all lines in buffer
                         posNewline = self.rx_buffer.find(b'\n')
                         if posNewline == -1:
                             break  # no more complete lines
@@ -357,14 +356,14 @@ class SerialManager:
                         try:
                             t_prewrite = time.time()
                             actuallySent = self.device.write(self.tx_buffer[self.tx_index])
-                            if time.time()-t_prewrite > 0.02:
+                            if time.time() - t_prewrite > 0.02:
                                 log.warn("TX > CONTROL_CHAR: Delay ")
                         except serial.SerialTimeoutException:
                             actuallySent = 0  # assume nothing has been sent
                             log.exception("TX > CONTROL_CHAR: Timeout!")
                         self.tx_index += actuallySent
                     else:
-                        if (time.time()-self.last_request_ready) > 2.0:
+                        if (time.time() - self.last_request_ready) > 2.0:
                             # ask to send a ready byte
                             # only ask for this when sending is on hold
                             # only ask once (and after a big time out)
@@ -372,7 +371,7 @@ class SerialManager:
                             try:
                                 t_prewrite = time.time()
                                 actuallySent = self.device.write(self.REQUEST_READY_CHAR)
-                                if time.time()-t_prewrite > 0.02:
+                                if time.time() - t_prewrite > 0.02:
                                     log.warn("TX > REQUEST_READY: Delay ")
                             except serial.SerialTimeoutException:
                                 # skip, report
