@@ -11,6 +11,13 @@ Glossary of terms
 
 .. glossary::
 
+
+   ASCII
+     The `"American Standard Code for Information Interchange"`__ character
+     encoding standard used to send text characters in binary format.
+
+     __ https://en.wikipedia.org/wiki/ASCII
+
    ATmega
      The microcontroller controls the `DriveBoard`
      It is an `Atmel ATmega328P`__ chip that integrates a CPU and severarl
@@ -27,6 +34,11 @@ Glossary of terms
       The BeagleBone Black board that runs GNU/Linux and the `backend`
       software and connects to the LAN via its Ethernet socket.
 
+   CNC
+      A `Computerized Numerical Control`__ machine, like the Lasersaur.
+
+      __ https://en.wikipedia.org/wiki/Numerical_control
+
    DriveBoard
      The printed circuit board were all the control logic electronics reside.
      See the `appropriate page on the LaserSaur manual`__
@@ -41,6 +53,7 @@ Glossary of terms
      The Javascript code that runs the LasaurApp in the browser. It's
      available on the 'frontend' subfolder of the repository.
 
+   G-code
    GCODE
      A simple language that defines the atomic operations performed by the
      cutter. This ranges from movements, to the cut operations, to status
@@ -53,10 +66,17 @@ Glossary of terms
       The CO2 laser generator which is the heart of the LaserSaur.
 
    PWM
-      The `Pulse-Width Modulation`__ is a modulation tecnique where the amplitude (the
-      height of the wave form) remains constant and instead the it's the
-      *duty-cycle* that may change from a period to another.
-      The `ATmega` on the `DriveBoard` is able to emit souch kind of signal
-      which can be used to control the power output of the `laser tube`.
+      The `Pulse-Width Modulation`__ is a modulation tecnique where the
+      amplitude (the height of the wave form) remains constant and instead the
+      it's the *duty-cycle* that may change from a period to another.  The
+      `ATmega` on the `DriveBoard` is able to emit souch kind of signal which
+      can be used to control the power output of the `laser tube`.
 
       __ https://en.wikipedia.org/wiki/Pulse-width_modulation
+
+   XON/XOFF
+      A `software flow control`__ method which uses a pair of `ASCII`
+      characters as a "semaphore" to control the flow of characters
+      transmitted over a serial line.
+
+      __ https://en.wikipedia.org/wiki/Software_flow_control

@@ -15,9 +15,9 @@ This module manages the communication between the `frontend` and the `ATmega`
 that *speaks* only serial.
 
 An instance of the `SerialManager` is istanciated by the main module logic.
-Its primary functions are those of sending `GCODE` commands to te microcontroller
-and read back status information about the just executed operation and the
-various subsystems and sensors.
+Its primary functions are those of sending `GCODE` commands to te
+microcontroller and read back status information about the just executed
+operation and the various subsystems and sensors.
 
 The main stuff is in `SerialManager.queue_gcode` which is the entry point
 from the frontend logic that enqueues new commands to be sent.
@@ -25,6 +25,17 @@ from the frontend logic that enqueues new commands to be sent.
 The other interesting code is in `SerialManager.send_queue_as_ready` method
 which polls the serial line for statuses and send new commands if there are any
 waiting in the send queue.
+
+The protocol employed uses two special control characters (`ASCII`'s ``DC2``
+and ``DC4``, used as ``READY_CHAR`` and ``REQUEST_READY_CHAR`` in the code) to
+control the flow on the wire. ``REQUEST_READY_CHAR`` is sent by the tx part of
+`SerialManager.send_queue_as_ready` and then the next chunk of data (as much
+as `SerialManager.TX_CHUNK_SIZE`) is sent as soon as a ``READY_CHAR`` is read
+from the rx part of the same method. It's a bit like half an `XON/XOFF` flow
+control with the logic reversed.
+
+THE `GCODE` commands are sent as-is or an error detection byte or a so-called
+error correction line is added to the bytes to be sent.
 """
 
 import collections
@@ -406,6 +417,9 @@ class SerialManager:
 
 
     def process_status_line(self, line):
+        """Process a line read from the serial interface and transform single byte
+        status reports into flags inside the status mapping.
+        """
         if b'#' in line[:3]:
             # print and ignore
             log.debug('Status: ignored %s', line.decode('ascii'))
