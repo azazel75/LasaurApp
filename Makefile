@@ -83,7 +83,7 @@ help::
 docs: $(DOCS_REQUIREMENTS_TIMESTAMP)
 	@echo "Compiling documentation..."
 	@source $(VENVDIR)/bin/activate && cd docs &&  $(MAKE) html
-	@$(PYTHON) -m webbrowser docs/_build/html/index.html
+	@$(PYTHON) -m webbrowser $(TOPDIR)/docs/_build/html/index.html
 
 help::
 	@echo -e "push-docs\n\t push documentation to gh-pages"
