@@ -34,6 +34,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinxcontrib.aafig'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
